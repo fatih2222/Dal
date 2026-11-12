@@ -1,6 +1,6 @@
 // Service worker: keeps the app's files on the phone so Dal opens without internet.
 // When you change index.html, raise VERSION so phones pick up the new files.
-const VERSION = "dal-v1";
+const VERSION = "dal-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 // Fonts and the PDF library come from these hosts; they are saved after first use.
 const RUNTIME_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com", "cdnjs.cloudflare.com"];
@@ -23,9 +23,10 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
 
   // The page itself: try the network first so updates arrive, fall back to the saved copy offline.
+  // "no-cache" makes the browser ask GitHub for the newest file instead of reusing its own short-term copy.
   if (req.mode === "navigate") {
     e.respondWith(
-      fetch(req)
+      fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
         .then((res) => {
           const copy = res.clone();
           caches.open(VERSION).then((c) => c.put("./index.html", copy));
