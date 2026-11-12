@@ -879,19 +879,56 @@ async function topicHints(topic, signal) {
     const out = await state.sample.json(`A reader wants a text about this topic (it may be written in Turkish or English): "${topic}"
 
 Which English Wikipedia articles cover it best? If the topic is one aspect of a large subject (for example "urbanisation in the Industrial Revolution"), first give the article most specific to that aspect, then the broader one. Give 1 to 3 exact article titles.
-Also give 5 to 12 English keywords that would appear in the parts of those articles about the asked-about aspect.
+Also give a short English search query for finding these articles on Wikipedia, and 5 to 12 English keywords that would appear in the parts of those articles about the asked-about aspect.
 
-Reply with only this JSON: {"titles": ["..."], "keywords": ["..."]}`, { modelTier: "quick", signal });
+Reply with only this JSON: {"titles": ["..."], "query": "...", "keywords": ["..."]}`, { modelTier: "quick", signal });
     const strs = (a) => (Array.isArray(a) ? a : []).filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim());
-    return { titles: strs(out && out.titles).slice(0, 3), keywords: strs(out && out.keywords).slice(0, 12) };
+    return { titles: strs(out && out.titles).filter((t) => !t.includes("|")).slice(0, 3), query: typeof (out && out.query) === "string" ? out.query.trim() : "", keywords: strs(out && out.keywords).slice(0, 12) };
   } catch (e) {
     if (e && e.code === "cancelled") throw e;
     logErr("hints", e);
     return null;
   }
 }
+// Real articles to choose from: the guessed titles that exist, plus English search results, each with
+// Wikipedia's short description. Disambiguation pages are left out.
+async function wikiCandidates(query, guesses, signal) {
+  const props = { prop: "description|pageprops", ppprop: "disambiguation" };
+  const reqs = [];
+  if (guesses.length) reqs.push(wiki("en", Object.assign({ action: "query", titles: guesses.join("|"), redirects: "1" }, props), signal));
+  if (query) reqs.push(wiki("en", Object.assign({ action: "query", generator: "search", gsrsearch: query, gsrlimit: "8", gsrnamespace: "0" }, props), signal));
+  const res = await Promise.all(reqs.map((p) => p.catch((e) => { if (e && e.code === "cancelled") throw e; return null; })));
+  const seen = new Map();
+  res.forEach((r) => {
+    const pages = ((r && r.query && r.query.pages) || []).slice().sort((a, b) => (a.index || 0) - (b.index || 0));
+    pages.forEach((p) => {
+      if (p.missing || p.invalid || (p.pageprops && "disambiguation" in p.pageprops) || seen.has(p.title)) return;
+      seen.set(p.title, p.description || "");
+    });
+  });
+  return [...seen].slice(0, 12).map(([title, desc]) => ({ title, desc }));
+}
+// Lets the cheap model pick from the real candidates. Returns titles (best first), [] if none fits, null on error.
+async function chooseArticles(topic, cands, signal) {
+  try {
+    const out = await state.sample.json(`A reader wants a text about this topic (it may be written in Turkish or English): "${topic}"
+
+These English Wikipedia articles exist:
+${cands.map((c, i) => `${i + 1}. ${c.title}${c.desc ? " — " + c.desc : ""}`).join("\n")}
+
+Pick the article that matches what the reader means. If the topic is one aspect of a larger subject, you may add the broader article as a second pick. Pick none if no article is really about the topic (for example, only a different meaning of the same word).
+
+Reply with only this JSON: {"pick": [numbers, best first, at most 2]}`, { modelTier: "quick", signal });
+    const nums = (out && Array.isArray(out.pick) ? out.pick : []).map((x) => parseInt(x, 10) - 1).filter((i) => cands[i]);
+    return [...new Set(nums)].slice(0, 2).map((i) => cands[i].title);
+  } catch (e) {
+    if (e && e.code === "cancelled") throw e;
+    logErr("choose", e);
+    return null;
+  }
+}
 async function wikiResolve(topic, signal) {
-  // 2. English search; accept a hit whose title shares a word with the topic.
+  // Plain search fallback: English search; accept a hit whose title shares a word with the topic.
   const words = fold(topic).match(/[a-z0-9]{3,}/g) || [];
   const en = await wiki("en", { action: "query", list: "search", srsearch: topic, srlimit: "5", srnamespace: "0" }, signal);
   const hits = (en.query && en.query.search) || [];
@@ -957,20 +994,24 @@ function pickSections(articles, keywords, budget) {
     return `# ${a.title}\n\n` + parts.map((c) => (c.s.head ? `== ${c.s.head} ==\n` : "") + c.text).join("\n\n");
   }).filter(Boolean).join("\n\n");
 }
-async function wikiSource(topic, signal) {
+// isTitle: the topic is already an English article title (branches). Returns { none, options } when
+// Wikipedia has articles but none is about the topic.
+async function wikiSource(topic, signal, isTitle) {
   let titles = [], keywords = fold(topic).match(/[a-z]{4,}/g) || [];
-  // 1. The topic is already an English title (branch titles are), possibly through a redirect.
-  const exact = await wikiTitle(topic, signal);
-  if (exact) titles = [exact];
-  else {
-    // 2. Ask which articles fit, and check that they exist.
+  if (isTitle) { const t = await wikiTitle(topic, signal); if (t) titles = [t]; }
+  if (!titles.length) {
+    // 1. Guess titles and a search query, 2. collect the real articles, 3. pick from them.
     const hints = await topicHints(topic, signal);
     if (hints) {
       keywords = keywords.concat(hints.keywords);
-      const found = await Promise.all(hints.titles.map((t) => wikiTitle(t, signal).catch(() => null)));
-      titles = [...new Set(found.filter(Boolean))].slice(0, 2);
+      const cands = await wikiCandidates(hints.query || topic, hints.titles, signal);
+      if (cands.length) {
+        const pick = await chooseArticles(topic, cands, signal);
+        if (pick && !pick.length) return { none: true, options: cands.slice(0, 3).map((c) => c.title) };
+        if (pick) titles = pick;
+      }
     }
-    // 3. Plain Wikipedia search as a fallback.
+    // 4. Plain Wikipedia search if the model could not help.
     if (!titles.length) { const t = await wikiResolve(topic, signal); if (t) titles = [t]; }
   }
   if (!titles.length) return null;
@@ -1714,8 +1755,8 @@ async function generate(topic, ctx) {
   const review = reviewWords();
   try {
     $("#loadProg").textContent = "Wikipedia’da madde aranıyor…";
-    const src = await wikiSource(topic, ctl.signal);
-    if (!src) return fail(`“${topic}” için Wikipedia’da uygun bir madde bulunamadı. Konuyu farklı ya da İngilizce yazmayı dene.`);
+    const src = await wikiSource(topic, ctl.signal, !!ctx);
+    if (!src || src.none) return fail(`“${topic}” için Wikipedia’da uygun bir madde bulunamadı.` + (src && src.options.length ? ` Şunlardan birini yazmayı dene: ${src.options.join(", ")}.` : " Konuyu farklı ya da İngilizce yazmayı dene."));
     $("#loadWhat").textContent = `Wikipedia’daki ${src.titles.map((t) => `“${t}”`).join(" ve ")} ${src.titles.length > 1 ? "maddeleri" : "maddesi"} ${round(target)} seviyesine uyarlanıyor.`;
     $("#loadProg").textContent = "Madde bulundu, uyarlanıyor.";
     const out = await state.sample.json(genPrompt(topic, target, ctx, review, src), {
