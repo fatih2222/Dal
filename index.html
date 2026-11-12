@@ -866,11 +866,31 @@ function wiki(lang, params, signal) {
     .then((r) => (r.ok ? r.json() : Promise.reject({ code: "wiki_" + r.status })));
 }
 const fold = (s) => String(s).toLocaleLowerCase("tr").replace(/ı/g, "i").normalize("NFD").replace(/[̀-ͯ]/g, "");
-async function wikiResolve(topic, signal) {
-  // 1. The topic is already an English title (branch titles are), possibly through a redirect.
-  const ex = await wiki("en", { action: "query", titles: topic, redirects: "1", prop: "pageprops", ppprop: "disambiguation" }, signal);
+// Returns the article's real title if it exists and is not a disambiguation page.
+async function wikiTitle(title, signal) {
+  const ex = await wiki("en", { action: "query", titles: title, redirects: "1", prop: "pageprops", ppprop: "disambiguation" }, signal);
   const p = ex.query && ex.query.pages && ex.query.pages[0];
-  if (p && !p.missing && !p.invalid && !(p.pageprops && "disambiguation" in p.pageprops)) return p.title;
+  return p && !p.missing && !p.invalid && !(p.pageprops && "disambiguation" in p.pageprops) ? p.title : null;
+}
+// A small, cheap call: which English articles cover the topic, and which words mark the asked-about aspect.
+async function topicHints(topic, signal) {
+  if (!state.sample) return null;
+  try {
+    const out = await state.sample.json(`A reader wants a text about this topic (it may be written in Turkish or English): "${topic}"
+
+Which English Wikipedia articles cover it best? If the topic is one aspect of a large subject (for example "urbanisation in the Industrial Revolution"), first give the article most specific to that aspect, then the broader one. Give 1 to 3 exact article titles.
+Also give 5 to 12 English keywords that would appear in the parts of those articles about the asked-about aspect.
+
+Reply with only this JSON: {"titles": ["..."], "keywords": ["..."]}`, { modelTier: "quick", signal });
+    const strs = (a) => (Array.isArray(a) ? a : []).filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim());
+    return { titles: strs(out && out.titles).slice(0, 3), keywords: strs(out && out.keywords).slice(0, 12) };
+  } catch (e) {
+    if (e && e.code === "cancelled") throw e;
+    logErr("hints", e);
+    return null;
+  }
+}
+async function wikiResolve(topic, signal) {
   // 2. English search; accept a hit whose title shares a word with the topic.
   const words = fold(topic).match(/[a-z0-9]{3,}/g) || [];
   const en = await wiki("en", { action: "query", list: "search", srsearch: topic, srlimit: "5", srnamespace: "0" }, signal);
@@ -883,16 +903,80 @@ async function wikiResolve(topic, signal) {
   if (trp) return trp.langlinks[0].title;
   return hits[0] ? hits[0].title : null;
 }
-async function wikiSource(topic, signal) {
-  const title = await wikiResolve(topic, signal);
-  if (!title) return null;
+const JUNK_SEC = /^(See also|References|Notes|Further reading|External links|Bibliography|Sources|Citations|Footnotes|Gallery|Notes and references)$/i;
+const wcount = (s) => (String(s).match(/\S+/g) || []).length;
+const firstWords = (s, n) => { const w = String(s).split(/\s+/); return w.length > n ? w.slice(0, n).join(" ") + " …" : String(s); };
+// Splits a plain-text article into its intro and sections (reference sections and their subsections dropped).
+function wikiSections(extract) {
+  const parts = extract.split(/\n(={2,})\s*(.+?)\s*\1\n/);
+  const all = [{ head: "", level: 1, text: parts[0].trim() }];
+  for (let i = 1; i < parts.length; i += 3) all.push({ head: parts[i + 1], level: parts[i].length, text: (parts[i + 2] || "").trim() });
+  let skip = 0;
+  return all.filter((s) => {
+    if (skip && s.level > skip) return false;
+    skip = 0;
+    if (JUNK_SEC.test(s.head)) { skip = s.level; return false; }
+    return !!s.text;
+  }).map((s, idx) => Object.assign(s, { idx }));
+}
+async function wikiArticle(title, signal) {
   const r = await wiki("en", { action: "query", prop: "extracts", explaintext: "1", exsectionformat: "wiki", redirects: "1", titles: title }, signal);
   const p = r.query && r.query.pages && r.query.pages[0];
-  if (!p || p.missing || !p.extract) return null;
-  let text = p.extract.split(/\n==\s*(See also|References|Notes|Further reading|External links|Bibliography|Sources|Citations|Footnotes)\s*==/i)[0];
-  const ws = text.split(/\s+/);
-  if (ws.length > 3000) text = ws.slice(0, 3000).join(" ");
-  return { title: p.title, text: text.trim() };
+  return p && !p.missing && p.extract ? { title: p.title, sections: wikiSections(p.extract) } : null;
+}
+// Picks the parts of the articles about the topic: every intro, then the sections that mention the keywords most,
+// then (if room is left) the main article's other sections in order. At most `budget` words in all.
+function pickSections(articles, keywords, budget) {
+  const kws = [...new Set(keywords.map((k) => k.toLowerCase().trim()).filter((k) => k.length >= 3))];
+  const score = (s) => {
+    const h = s.head.toLowerCase(), t = s.text.toLowerCase();
+    let n = 0;
+    kws.forEach((k) => {
+      if (h.includes(k)) n += 5;
+      for (let i = t.indexOf(k), c = 0; i >= 0 && c < 20; i = t.indexOf(k, i + k.length), c++) n++;
+    });
+    return n / Math.sqrt(1 + wcount(s.text) / 150);
+  };
+  const chosen = new Map();
+  let left = budget;
+  const take = (a, s, cap) => {
+    const key = a.title + "|" + s.idx;
+    if (chosen.has(key) || left < 80) return;
+    const text = firstWords(s.text, Math.min(cap || Infinity, left));
+    chosen.set(key, { a, s, text });
+    left -= wcount(text);
+  };
+  articles.forEach((a) => take(a, a.sections[0], 400));
+  const pool = [];
+  articles.forEach((a) => a.sections.slice(1).forEach((s) => pool.push({ a, s, sc: score(s) })));
+  pool.filter((x) => x.sc > 0).sort((x, y) => y.sc - x.sc).forEach((x) => take(x.a, x.s, 900));
+  articles[0].sections.slice(1).forEach((s) => take(articles[0], s, 600));
+  return articles.map((a) => {
+    const parts = [...chosen.values()].filter((c) => c.a === a).sort((x, y) => x.s.idx - y.s.idx);
+    if (!parts.length) return "";
+    return `# ${a.title}\n\n` + parts.map((c) => (c.s.head ? `== ${c.s.head} ==\n` : "") + c.text).join("\n\n");
+  }).filter(Boolean).join("\n\n");
+}
+async function wikiSource(topic, signal) {
+  let titles = [], keywords = fold(topic).match(/[a-z]{4,}/g) || [];
+  // 1. The topic is already an English title (branch titles are), possibly through a redirect.
+  const exact = await wikiTitle(topic, signal);
+  if (exact) titles = [exact];
+  else {
+    // 2. Ask which articles fit, and check that they exist.
+    const hints = await topicHints(topic, signal);
+    if (hints) {
+      keywords = keywords.concat(hints.keywords);
+      const found = await Promise.all(hints.titles.map((t) => wikiTitle(t, signal).catch(() => null)));
+      titles = [...new Set(found.filter(Boolean))].slice(0, 2);
+    }
+    // 3. Plain Wikipedia search as a fallback.
+    if (!titles.length) { const t = await wikiResolve(topic, signal); if (t) titles = [t]; }
+  }
+  if (!titles.length) return null;
+  const articles = (await Promise.all(titles.map((t) => wikiArticle(t, signal)))).filter((a) => a && a.sections.length);
+  if (!articles.length) return null;
+  return { title: articles[0].title, titles: articles.map((a) => a.title), text: pickSections(articles, keywords, 3000) };
 }
 const byId = (id) => state.library.find((d) => d.id === id);
 
@@ -1383,21 +1467,23 @@ function genPrompt(topic, target, ctx, review, src) {
   const branch = ctx
     ? `\nThis text is one step in a reading path: ${[...(ctx.parent.path || [ctx.parent.title]), ctx.branch.title].join(" → ")}. The previous text was "${ctx.parent.title}". Its summary: ${ctx.parent.summary || ctx.parent.paragraphs[0].slice(0, 500)}\nNow write about "${topic}". Begin with one or two sentences that connect it to the previous text, but do not repeat the previous text's content.\n`
     : "";
-  return `<source title="${src.title}">
+  const names = (src.titles || [src.title]).map((t) => `"${t}"`).join(" and ");
+  return `<source>
 ${src.text}
 </source>
 
-Above is the English Wikipedia article "${src.title}". You are turning it into a reading text for a Turkish adult who is improving their academic English by reading about social-science topics they are curious about.
+Above are the parts of the English Wikipedia article${(src.titles || []).length > 1 ? "s" : ""} ${names} that relate to the reader's topic. You are turning them into a reading text for a Turkish adult who is improving their academic English by reading about social-science topics they are curious about.
 
 Requested topic (may be written in Turkish or English): "${topic}"
 ${branch}
-Write an engaging, informative text in English about this topic, adapted from the source article, in the style of a good encyclopedia or popular-academic article. Your job is to fit the article to the reader's level and to the requested length; the content comes from the article.
+Write an engaging, informative text in English about this topic, adapted from the source, in the style of a good encyclopedia or popular-academic article. Your job is to fit the source to the reader's level and to the requested length; the content comes from the source.
 
 Content rules:
-- Use only facts stated in the source article. Never add facts, quotes, statistics, dates or names that are not in it.
-- If the requested topic is narrower than the article (one aspect of it), focus on the parts of the article about that aspect.
-- If the article does not really cover the requested topic, set "insufficient": true, explain briefly in Turkish in "note", and leave "paragraphs" empty.
-- Social-science framing where the article supports it: context, causes, key people and ideas, debates, consequences.
+- Use only facts stated in the source. Never add facts, quotes, statistics, dates or names that are not in it.
+- Centre the text on the requested topic. Where the source says less about it than the length needs, fill the rest with closely related background from the source (causes, context, consequences) that helps the reader understand the topic.
+- If the source still does not have enough for the requested length, write a somewhat shorter text instead of adding outside facts. A shorter text is always better than no text.
+- Set "insufficient": true (with a short Turkish explanation in "note" and empty "paragraphs") only if the source has nothing at all to do with the topic.
+- Social-science framing where the source supports it: context, causes, key people and ideas, debates, consequences.
 - "note" is "" unless something important about the source needs saying (in Turkish).
 
 Language rules:
@@ -1628,7 +1714,7 @@ async function generate(topic, ctx) {
     $("#loadProg").textContent = "Wikipedia’da madde aranıyor…";
     const src = await wikiSource(topic, ctl.signal);
     if (!src) return fail(`“${topic}” için Wikipedia’da uygun bir madde bulunamadı. Konuyu farklı ya da İngilizce yazmayı dene.`);
-    $("#loadWhat").textContent = `Wikipedia’daki “${src.title}” maddesi ${round(target)} seviyesine uyarlanıyor.`;
+    $("#loadWhat").textContent = `Wikipedia’daki ${src.titles.map((t) => `“${t}”`).join(" ve ")} ${src.titles.length > 1 ? "maddeleri" : "maddesi"} ${round(target)} seviyesine uyarlanıyor.`;
     $("#loadProg").textContent = "Madde bulundu, uyarlanıyor.";
     const out = await state.sample.json(genPrompt(topic, target, ctx, review, src), {
       modelTier: "default",
@@ -1662,7 +1748,7 @@ async function generate(topic, ctx) {
       kind: "text", id: "t" + Date.now().toString(36), topic, levelLabel: label, target: round(target),
       title: String(out.title || topic), summary: String(out.summary || ""), note: typeof out.note === "string" ? out.note : "",
       paragraphs, terms, units, branches,
-      sources: [src.title, ...(Array.isArray(out.sources) ? out.sources : []).filter((s) => typeof s === "string" && s !== src.title)].slice(0, 4),
+      sources: [...src.titles, ...(Array.isArray(out.sources) ? out.sources : []).filter((s) => typeof s === "string" && !src.titles.includes(s))].slice(0, 4),
       taps: [], sentHelps: [], translations: {}, simplified: {}, sentTr: {}, structure: {},
       finished: false, createdAt: Date.now(),
       diag: buildDiag(target, draft, revised, paragraphs, terms, units, branches, tGen, ctx),
@@ -1933,7 +2019,7 @@ function renderEnd() {
     });
     src.append(ul);
   }
-  src.append(el("p", null, "Metin, ilk bağlantıdaki Wikipedia maddesinden alınıp seviyene ve seçtiğin uzunluğa göre uyarlanır."));
+  src.append(el("p", null, "Metin, bu listenin başındaki Wikipedia maddelerinden alınıp seviyene ve seçtiğin uzunluğa göre uyarlanır."));
   box.append(src);
 }
 function onTapsChanged() {
