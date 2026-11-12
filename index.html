@@ -779,7 +779,10 @@ function localDb() {
 const KEY_LS = "dal-api-key";
 const getKey = () => { try { return localStorage.getItem(KEY_LS) || ""; } catch (e) { return ""; } };
 const TIERS = {
-  default: { model: "claude-sonnet-5-5", effort: "medium", fallback: true },
+  // Texts, adaptations, revisions: Haiku held the target level about as well as Sonnet at roughly a tenth of the cost.
+  default: { model: "claude-haiku-5-5", effort: "low", fallback: false },
+  // Reading scanned pages and photos stays on Sonnet: a misread page spoils the whole text.
+  vision: { model: "claude-sonnet-5-5", effort: "medium", fallback: true },
   quick: { model: "claude-haiku-5-5", effort: "low", fallback: false },
 };
 const blobToB64 = (b) => new Promise((res, rej) => {
@@ -846,7 +849,10 @@ function makeSample() {
     const content = [];
     for (const b of opts.images || []) content.push({ type: "image", source: { type: "base64", media_type: b.type || "image/jpeg", data: await blobToB64(b) } });
     content.push({ type: "text", text: prompt });
-    const body = { model: tier.model, max_tokens: 32000, stream: true, output_config: { effort: tier.effort }, messages: [{ role: "user", content }] };
+    const output_config = { effort: tier.effort };
+    // With a schema the reply is guaranteed to be valid JSON of that shape (quotes inside strings are escaped for us).
+    if (opts.schema) output_config.format = { type: "json_schema", schema: opts.schema };
+    const body = { model: tier.model, max_tokens: 32000, stream: true, output_config, messages: [{ role: "user", content }] };
     const headers = {
       "content-type": "application/json",
       "x-api-key": key,
@@ -863,12 +869,18 @@ function makeSample() {
       }
     }
   }
-  sample.json = async (prompt, opts) => {
-    const { text } = await sample(prompt, opts);
-    let t = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const parseJson = (text) => {
+    const t = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
     const a = t.indexOf("{"), b = t.lastIndexOf("}");
     if (a < 0 || b < a) throw { code: "invalid_json" };
     try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { throw { code: "invalid_json" }; }
+  };
+  // Replies without a schema are occasionally broken JSON (an unescaped quote); one retry fixes nearly all of them.
+  sample.json = async (prompt, opts) => {
+    for (let i = 0; ; i++) {
+      try { return parseJson((await sample(prompt, opts)).text); }
+      catch (e) { if (!(e && e.code === "invalid_json") || i >= 1) throw e; }
+    }
   };
   sample.limits = async () => ({ images: { maxCount: 10 } });
   return sample;
@@ -1699,6 +1711,8 @@ ${cands.map((c, k) => `${k + 1}.\nOriginal: ${c.before}\nChanged: ${c.after}`).j
 Reply with only this JSON:
 {"ok": [numbers of the acceptable changes]}`;
 }
+const SWAPS_SCHEMA = { type: "object", properties: { swaps: { type: "array", items: { type: "object", properties: { old: { type: "string" }, new: { type: "string" } }, required: ["old", "new"], additionalProperties: false } } }, required: ["swaps"], additionalProperties: false };
+const OK_SCHEMA = { type: "object", properties: { ok: { type: "array", items: { type: "integer" } } }, required: ["ok"], additionalProperties: false };
 // Brings a text closer to its target score: the model proposes word swaps, a second call checks them for
 // naturalness, and the app applies the approved ones while measuring. Up to two rounds; the closest version wins.
 async function reviseToTarget(title, paragraphs, target, terms, m1, signal, what) {
@@ -1710,14 +1724,14 @@ async function reviseToTarget(title, paragraphs, target, terms, m1, signal, what
       ? `${what} hedeften zor çıktı, bazı kelimeler sadeleştiriliyor${r ? " (2. tur)" : ""}…`
       : `${what} hedeften kolay çıktı, hedef kelimeler ekleniyor${r ? " (2. tur)" : ""}…`;
     try {
-      const rev = await state.sample.json(revisePrompt(title, paragraphs, target, best, terms), { modelTier: "default", signal });
+      const rev = await state.sample.json(revisePrompt(title, paragraphs, target, best, terms), { modelTier: "default", signal, schema: SWAPS_SCHEMA });
       const swaps = rev && Array.isArray(rev.swaps) ? rev.swaps : [];
       if (!swaps.length) { revised.rounds.push({ error: "empty" }); continue; }
       const cands = locateSwaps(paragraphs, swaps, terms);
       let good = [];
       if (cands.length) {
         $("#loadProg").textContent = "Önerilen kelimeler doğallık ve anlam açısından kontrol ediliyor…";
-        const chk = await state.sample.json(checkSwapsPrompt(cands), { modelTier: "default", signal });
+        const chk = await state.sample.json(checkSwapsPrompt(cands), { modelTier: "default", signal, schema: OK_SCHEMA });
         const okIdx = new Set((chk && Array.isArray(chk.ok) ? chk.ok : []).map((x) => parseInt(x, 10) - 1));
         good = cands.filter((c, k) => okIdx.has(k));
       }
@@ -3114,7 +3128,7 @@ async function transcribe(blobs, onProg) {
   const out = [];
   for (let i = 0; i < blobs.length; i += max) {
     const batch = blobs.slice(i, i + max);
-    const { text } = await state.sample(`These are ${batch.length} page image(s) from a document, in order. Transcribe all of the English text exactly as written, in reading order. Put a blank line between paragraphs and "## " before headings. Leave out page numbers, running headers and footers, and the contents of figures and tables. Reply with only the text.`, { images: batch, modelTier: "default", cache: false });
+    const { text } = await state.sample(`These are ${batch.length} page image(s) from a document, in order. Transcribe all of the English text exactly as written, in reading order. Put a blank line between paragraphs and "## " before headings. Leave out page numbers, running headers and footers, and the contents of figures and tables. Reply with only the text.`, { images: batch, modelTier: "vision", cache: false });
     out.push(String(text || "").trim());
     if (onProg) onProg(Math.min(i + max, blobs.length), blobs.length);
   }
