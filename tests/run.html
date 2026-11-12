@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dal testleri</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; color: #222; background: #fafafa; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  #sum { font-weight: 700; margin: 8px 0; }
+  #sum.ok, li.ok { color: #1d7a45; } #sum.fail, li.fail { color: #b3261e; }
+  ul { list-style: none; padding: 0; margin: 0 0 16px; }
+  li { padding: 2px 0; overflow-wrap: anywhere; }
+  /* The app frame must stay on screen: browsers pause animation frames in off-screen frames, and PDF drawing waits for them. */
+  #stage { position: fixed; top: 8px; right: 8px; z-index: 1; }
+</style>
+</head>
+<body>
+<h1>Dal testleri</h1>
+<p>Gerçek API'ye ya da Wikipedia'ya istek gönderilmez; cevaplar sahte. Testler ayrı bir veritabanı kullanır.
+Sekme ekranda açık kalmalı: arka plandaki sekmede tarayıcı çizimi durdurur ve PDF testleri takılır.</p>
+<div id="sum">Çalışıyor…</div>
+<ul id="out"></ul>
+<div id="stage"></div>
+<script src="harness.js"></script>
+<script src="unit.test.js"></script>
+<script src="flows.test.js"></script>
+<script>runAll();</script>
+</body>
+</html>

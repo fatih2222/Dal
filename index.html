@@ -749,9 +749,11 @@ const col = () => state.db.collection("data/users/" + state.uid);
 
 // On-device database with the same shape the code used before (collection → doc → set/delete, collection.get).
 // Every document lives in one IndexedDB store under the key "<collection path>/<doc id>".
+// "?test" in the address (used by tests/run.html) keeps tests away from the real data and key.
+const TEST_MODE = new URLSearchParams(location.search).has("test");
 function localDb() {
   const opened = new Promise((res, rej) => {
-    const r = indexedDB.open("dal", 1);
+    const r = indexedDB.open(TEST_MODE ? "dal-test" : "dal", 1);
     r.onupgradeneeded = () => r.result.createObjectStore("docs");
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -776,7 +778,7 @@ function localDb() {
 }
 
 // Anthropic API in place of the Claude artifact's text generation. The key is kept only in this browser.
-const KEY_LS = "dal-api-key";
+const KEY_LS = TEST_MODE ? "dal-api-key-test" : "dal-api-key";
 const getKey = () => { try { return localStorage.getItem(KEY_LS) || ""; } catch (e) { return ""; } };
 const TIERS = {
   // Texts, adaptations, revisions: Haiku held the target level about as well as Sonnet at roughly a tenth of the cost.
