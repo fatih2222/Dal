@@ -762,7 +762,7 @@ function localDb() {
 const KEY_LS = "dal-api-key";
 const getKey = () => { try { return localStorage.getItem(KEY_LS) || ""; } catch (e) { return ""; } };
 const TIERS = {
-  default: { model: "claude-opus-5-5", effort: "medium", fallback: true },
+  default: { model: "claude-sonnet-5-5", effort: "medium", fallback: true },
   quick: { model: "claude-haiku-5-5", effort: "low", fallback: false },
 };
 const blobToB64 = (b) => new Promise((res, rej) => {
@@ -891,7 +891,7 @@ async function wikiSource(topic, signal) {
   if (!p || p.missing || !p.extract) return null;
   let text = p.extract.split(/\n==\s*(See also|References|Notes|Further reading|External links|Bibliography|Sources|Citations|Footnotes)\s*==/i)[0];
   const ws = text.split(/\s+/);
-  if (ws.length > 7000) text = ws.slice(0, 7000).join(" ");
+  if (ws.length > 3000) text = ws.slice(0, 3000).join(" ");
   return { title: p.title, text: text.trim() };
 }
 const byId = (id) => state.library.find((d) => d.id === id);
