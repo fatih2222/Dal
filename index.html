@@ -186,14 +186,24 @@ body.picking article{padding-bottom:40vh}
 .dupask .acts button.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
 #tree{padding:1.2rem 0 4rem}
 #tree h1{font-family:Literata,Georgia,serif;font-weight:600;font-size:clamp(1.6rem,1.2rem + 1.6vw,2.2rem);line-height:1.15;margin:.6rem 0 .4rem}
-#tree ul{list-style:none;margin:0;padding:0 0 0 1.1rem;border-left:1px solid var(--line)}
-#tree > ul{padding-left:0;border-left:0}
-.tnode{display:flex;align-items:center;gap:.5rem;padding:.4rem 0}
-.tnode .tt{flex:1;min-width:0;text-align:left;background:none;border:0;padding:.2rem 0;cursor:pointer;font-family:Literata,Georgia,serif;font-size:1.08rem;color:var(--ink)}
-.tnode .st{color:var(--muted);font-size:.85rem;white-space:nowrap}
-.tnode.sugg .tt{color:var(--muted);font-style:italic}
-.tnode .del{background:none;border:1px solid transparent;border-radius:999px;padding:.25rem .6rem;color:var(--muted);cursor:pointer;white-space:nowrap;font-size:.85rem}
-.tnode .del.sure{border-color:var(--danger);color:var(--danger)}
+/* Reading tree as a branching path: trunk on the left, each branch curves out one step to the right. */
+.dtree{position:relative;margin-top:1.2rem}
+.dlines{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.dlines path{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;opacity:.5}
+.dlines path.sugg{stroke:var(--muted);stroke-width:1.8;stroke-dasharray:3 5;opacity:.8}
+.drow{position:relative;display:flex;align-items:flex-start;gap:.75rem;padding:.6rem 0 .6rem calc(min(var(--d),6) * 1.35rem)}
+.ddot{flex:none;box-sizing:border-box;width:16px;height:16px;border-radius:50%;margin-top:.3rem;background:var(--bg);border:3px solid var(--accent);position:relative;z-index:1}
+.ddot.done{background:var(--accent)}
+.drow.root .ddot{width:20px;height:20px;margin-top:.45rem}
+.drow.sugg .ddot{width:12px;height:12px;margin:.42rem 2px 0;border:2px dashed var(--muted)}
+.drow .dbody{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:.15rem .6rem}
+.drow .tt{background:none;border:0;padding:0;text-align:left;cursor:pointer;font-family:Literata,Georgia,serif;font-size:1.04rem;line-height:1.35;color:var(--ink);overflow-wrap:anywhere}
+.drow.root .tt{font-size:1.18rem;font-weight:600}
+.drow.sugg .tt{color:var(--muted);font-style:italic;font-size:.98rem}
+.drow .st{color:var(--muted);font-size:.8rem;white-space:nowrap}
+.drow .del{margin-left:auto;background:none;border:1px solid transparent;border-radius:999px;padding:.15rem .6rem;color:var(--muted);cursor:pointer;white-space:nowrap;font-size:.8rem}
+.drow .del.sure{border-color:var(--danger);color:var(--danger)}
+.drow .dupask{flex-basis:100%}
 .libhead{display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-bottom:.5rem}
 .libhead h2{margin:0!important}
 .tapchip.guess{border-style:dashed}
@@ -446,6 +456,7 @@ ul.nblist:empty,.lib ul:empty{display:none}
       <p class="levelinfo" id="levelInfo"></p>
       <details class="lvmore">
         <summary>Seviye ve uzunluğu değiştir</summary>
+        <div class="row" id="readerRow"><span class="lbl">Okur seviyen yanlış görünüyorsa düzelt</span><label class="scorein">Puan <input id="readerIn" type="number" min="5" max="95" step="1" inputmode="numeric" aria-label="Okur seviyen"></label><button class="chip" id="readerSet" type="button">Güncelle</button><span class="hint" id="readerMsg" style="flex-basis:100%;margin:0"></span></div>
         <div class="row" id="levels"><span class="lbl">Seviye</span><label class="scorein" id="scoreWrap">Puan <input id="scoreIn" type="number" min="5" max="95" step="1" inputmode="numeric" aria-label="Zorluk puanı"></label></div>
         <div class="row" id="lens"><span class="lbl">Uzunluk</span></div>
       </details>
@@ -1129,9 +1140,11 @@ function autoSnapshot(snaps) {
    ========================================================= */
 // A text below the reader's level that they read almost without help says nothing about how far up they are.
 const uninformative = (e) => e.capped === "up" && typeof e.lvl === "number" && e.reader < e.lvl;
+// A level the reader set by hand is a fresh start: readings before it no longer count.
+const afterReset = (e) => { const r = state.settings.levelReset; return !(r && e.at <= r.at); };
 function readerLevel(hist) {
   const s = state.settings;
-  const h = (hist || s.history).filter((e) => !uninformative(e)).slice(-5);
+  const h = (hist || s.history).filter((e) => !uninformative(e) && afterReset(e)).slice(-5);
   let sw = 0, sv = 0;
   h.forEach((e, i) => {
     const gap = Math.abs(e.text - e.reader);
@@ -1139,7 +1152,7 @@ function readerLevel(hist) {
     sw += w; sv += w * e.reader;
   });
   const ws = Math.max(0, 5 - h.length) * 0.8;
-  sw += ws; sv += ws * SEED(s.start);
+  sw += ws; sv += ws * (s.levelReset ? s.levelReset.value : SEED(s.start));
   return sv / sw;
 }
 const targetScore = () => {
@@ -1184,7 +1197,7 @@ function renderGauge() {
   g.innerHTML = "";
   const track = el("div", "gtrack");
   for (let l = 1; l <= 6; l++) { const seg = el("i", "gseg l" + l); seg.style.width = (BOUND[l] - BOUND[l - 1]) + "%"; track.append(seg); }
-  state.settings.history.filter((e) => !uninformative(e)).slice(-5).forEach((e) => {
+  state.settings.history.filter((e) => !uninformative(e) && afterReset(e)).slice(-5).forEach((e) => {
     const dt = el("span", "gdot");
     dt.style.left = Math.min(100, Math.max(0, e.reader)) + "%";
     track.append(dt);
@@ -1200,7 +1213,7 @@ function renderGauge() {
   const leg = el("div", "glegend");
   const li = (cls, txt) => { const s = el("span"); s.append(el("i", cls), txt); leg.append(s); };
   li("lg-big", "Okur seviyen");
-  if (state.settings.history.some((e) => !uninformative(e))) li("lg-dot", "Son metinlerdeki okuma puanların");
+  if (state.settings.history.some((e) => !uninformative(e) && afterReset(e))) li("lg-dot", "Son metinlerdeki okuma puanların");
   if (Math.abs(tg - rl) > 1) {
     const tk = el("span", "gtick");
     tk.style.left = Math.min(100, Math.max(0, tg)) + "%";
@@ -1235,8 +1248,11 @@ function renderLevels() {
     b.onclick = () => { s.len = k; renderLevels(); saveSettings(); };
     lb.append(b);
   });
-  const n = s.history.length;
-  const basis = n ? `Son ${Math.min(5, n)} bitirilmiş metne dayanıyor.` : `Henüz bitirilmiş metin yok; başlangıç değeri ${s.start} seviyesinden geliyor.`;
+  $("#readerIn").placeholder = String(round(rl));
+  const n = s.history.filter(afterReset).length;
+  const basis = s.levelReset
+    ? (n ? `Elle girdiğin ${s.levelReset.value} değerinden sonra bitirdiğin ${Math.min(5, n)} metne dayanıyor.` : `Elle girdiğin ${s.levelReset.value} değerinden başlıyor; bitirdiğin metinlerle güncellenecek.`)
+    : n ? `Son ${Math.min(5, n)} bitirilmiş metne dayanıyor.` : `Henüz bitirilmiş metin yok; başlangıç değeri ${s.start} seviyesinden geliyor.`;
   $("#levelInfo").textContent = s.mode === "auto"
     ? `Yeni metin okur seviyende yazılır. ${basis}`
     : custom
@@ -1251,6 +1267,17 @@ $("#scoreIn").addEventListener("change", (e) => {
   renderLevels();
   saveSettings();
 });
+$("#readerSet").onclick = () => {
+  const v = parseInt($("#readerIn").value, 10);
+  if (!Number.isFinite(v)) { $("#readerMsg").textContent = "5 ile 95 arasında bir puan yaz."; return; }
+  const s = state.settings;
+  s.levelReset = { at: Date.now(), value: Math.min(95, Math.max(5, v)) };
+  $("#readerIn").value = "";
+  renderLevels();
+  saveSettings();
+  $("#readerMsg").textContent = `Okur seviyen ${s.levelReset.value} (${scoreName(s.levelReset.value)}) oldu. Bundan sonra bitirdiğin metinlerle buradan devam ederek güncellenecek.`;
+};
+$("#readerIn").addEventListener("input", () => { $("#readerMsg").textContent = ""; });
 TOPICS.forEach((t) => {
   const b = el("button", "chip topic", t);
   b.type = "button";
@@ -1404,35 +1431,72 @@ function showTree(rootId) {
   state.treeRoot = rootId;
   const box = $("#tree");
   box.innerHTML = "";
-  const ul = el("ul");
-  ul.append(treeNode(root));
-  box.append(el("h1", null, root.title), el("p", "lvl", "Okuma ağacı. Bir metne dokunarak aç, önerilen dallardan birine dokunarak yeni metin üret."), ul);
+  const tree = el("div", "dtree");
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "dlines");
+  svg.setAttribute("aria-hidden", "true");
+  tree.append(svg);
+  const rows = [];
+  treeRows(root, 0, null, rows);
+  rows.forEach((r) => {
+    const row = el("div", "drow" + (r.depth === 0 ? " root" : "") + (r.b ? " sugg" : ""));
+    row.style.setProperty("--d", r.depth);
+    row.dataset.key = r.key;
+    if (r.parent) row.dataset.parent = r.parent;
+    const body = el("div", "dbody");
+    if (r.b) {
+      const tb = el("button", "tt", r.b.title);
+      tb.type = "button";
+      tb.onclick = () => openBranch(r.d, r.bi, false, body);
+      body.append(tb, el("span", "st", "önerilen dal"));
+      row.append(el("span", "ddot"), body);
+    } else {
+      const t = el("button", "tt", r.d.title);
+      t.type = "button";
+      t.onclick = () => openDoc(r.d);
+      body.append(t, el("span", "st", r.d.finished ? "bitti" : "okunuyor"), delButton(() => subtreeIds(r.d.id)));
+      row.append(el("span", "ddot" + (r.d.finished ? " done" : "")), body);
+    }
+    tree.append(row);
+  });
+  box.append(el("h1", null, root.title), el("p", "lvl", "Okuma ağacın. Bir metne dokunarak aç; kesik çizgili dallara dokunarak o konuda yeni metin üret."), tree);
+  // Lines are drawn from the real positions of the dots, and redrawn whenever the layout changes size.
+  if (state.treeRO) state.treeRO.disconnect();
+  state.treeRO = new ResizeObserver(() => drawTreeLines(tree));
+  state.treeRO.observe(tree);
   show("tree");
+  drawTreeLines(tree);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawTreeLines(tree));
 }
-function treeNode(d) {
-  const li = el("li");
-  const row = el("div", "tnode");
-  const t = el("button", "tt", d.title);
-  t.onclick = () => openDoc(d);
-  row.append(t, el("span", "st", d.finished ? "bitti" : "okunuyor"), delButton(() => subtreeIds(d.id)));
-  li.append(row);
-  const kids = state.library.filter((x) => x.parentId === d.id).sort((a, b) => a.createdAt - b.createdAt);
-  const sugg = (d.branches || []).map((b, bi) => ({ b, bi })).filter(({ b }) => !(b.childId && byId(b.childId)));
-  if (kids.length || sugg.length) {
-    const ul = el("ul");
-    kids.forEach((k) => ul.append(treeNode(k)));
-    sugg.forEach(({ b, bi }) => {
-      const sl = el("li");
-      const r = el("div", "tnode sugg");
-      const tb = el("button", "tt", b.title);
-      tb.onclick = () => openBranch(d, bi, false, sl);
-      r.append(tb, el("span", "st", "önerildi"));
-      sl.append(r);
-      ul.append(sl);
-    });
-    li.append(ul);
-  }
-  return li;
+// Depth-first: each text, then its read branches, then its suggested ones.
+function treeRows(d, depth, parent, out) {
+  out.push({ d, depth, key: d.id, parent });
+  state.library.filter((x) => x.parentId === d.id).sort((a, b) => a.createdAt - b.createdAt)
+    .forEach((k) => treeRows(k, depth + 1, d.id, out));
+  (d.branches || []).forEach((b, bi) => {
+    if (!(b.childId && byId(b.childId))) out.push({ d, b, bi, depth: depth + 1, key: d.id + "#" + bi, parent: d.id });
+  });
+}
+function drawTreeLines(tree) {
+  const svg = tree.querySelector(".dlines");
+  const base = tree.getBoundingClientRect();
+  if (!svg || !base.width) return;
+  svg.setAttribute("width", base.width);
+  svg.setAttribute("height", base.height);
+  const pos = new Map();
+  tree.querySelectorAll(".drow").forEach((r) => {
+    const d = r.querySelector(".ddot").getBoundingClientRect();
+    pos.set(r.dataset.key, { x: d.left + d.width / 2 - base.left, y: d.top + d.height / 2 - base.top });
+  });
+  const paths = [];
+  tree.querySelectorAll(".drow[data-parent]").forEach((r) => {
+    const p = pos.get(r.dataset.parent), c = pos.get(r.dataset.key);
+    if (!p || !c) return;
+    const bend = Math.max(p.y, c.y - 34);
+    const dpath = Math.abs(p.x - c.x) < 1 ? `M${p.x} ${p.y}V${c.y}` : `M${p.x} ${p.y}V${bend}C${p.x} ${c.y} ${c.x} ${bend} ${c.x} ${c.y}`;
+    paths.push(`<path${r.classList.contains("sugg") ? ' class="sugg"' : ""} d="${dpath}"/>`);
+  });
+  svg.innerHTML = paths.join("");
 }
 
 /* =========================================================
