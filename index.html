@@ -37,6 +37,12 @@
 }
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
+/* App feel: never pan sideways, no visible scrollbar, no rubber-band at the ends. Long words break instead of widening the page. */
+html{overflow-x:hidden;overscroll-behavior-y:none}
+body{overflow-x:clip}
+html{scrollbar-width:none}
+html::-webkit-scrollbar{display:none}
+.wrap{overflow-wrap:anywhere}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:1.05rem;line-height:1.5;-webkit-tap-highlight-color:transparent}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
 button{font:inherit;color:inherit}
@@ -271,7 +277,7 @@ details.endsec[open] summary{margin-bottom:.6rem}
 details.endsec[open] summary::after{content:"Gizle"}
 .ptitle{font-weight:700}
 .prof summary .pbar{flex:1 1 7rem;min-width:7rem;height:8px}
-.bscroll{display:flex;gap:.7rem;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -1.25rem;padding:0 1.25rem .5rem;scroll-padding-left:1.25rem}
+.bscroll{scrollbar-width:none;display:flex;gap:.7rem;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -1.25rem;padding:0 1.25rem .5rem;scroll-padding-left:1.25rem}
 .bscroll .bitem{flex:0 0 min(80%,20rem);scroll-snap-align:start;margin:0}
 .bscroll .branch{height:100%}
 #readprog{position:fixed;top:env(safe-area-inset-top,0px);left:0;height:3px;width:0;background:var(--accent);z-index:12;transition:width .12s linear}
@@ -1340,7 +1346,7 @@ function renderShelf() {
     b.onclick = () => (imp.sections.length === 1 && byId(imp.sections[0]) ? openDoc(byId(imp.sections[0])) : showImport(imp.id));
     box.append(b);
   });
-  if (!state.imports.length) box.append(el("p", "shelfempty", "Henüz kitap yok. Bir PDF'i sohbette Claude'a gönder ya da Oku sekmesindeki “Kendi metnini getir” ile ekle; ilk sayfası kapak olarak burada görünür."));
+  if (!state.imports.length) box.append(el("p", "shelfempty", "Henüz kitap yok. Oku sekmesindeki “Kendi metnini getir” ile bir PDF ya da metin ekle; ilk sayfası kapak olarak burada görünür."));
 
 }
 async function deleteDocs(ids) {
