@@ -104,7 +104,7 @@ function measureTokens(paragraphs) {
       if (/^\d/.test(raw)) continue;
       let info = wordInfo(norm(raw));
       if (raw === "I" || /^I['’]/.test(raw)) info = { l: 1 };
-      else if (raw[0] !== raw[0].toLowerCase() && (!isFirst || !info)) continue;
+      else if (raw[0] !== raw[0].toLowerCase() && (!isFirst || !info || info.freq)) continue;
       counts[info ? info.l : 7]++; n++;
     }
   }));

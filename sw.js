@@ -1,6 +1,6 @@
 // Service worker: keeps the app's files on the phone so Dal opens without internet.
 // When you change index.html, raise VERSION so phones pick up the new files.
-const VERSION = "dal-v2";
+const VERSION = "dal-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 // Fonts and the PDF library come from these hosts; they are saved after first use.
 const RUNTIME_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com", "cdnjs.cloudflare.com"];
@@ -39,6 +39,7 @@ self.addEventListener("fetch", (e) => {
 
   const sameOrigin = url.origin === self.location.origin;
   if (!sameOrigin && !RUNTIME_HOSTS.includes(url.hostname)) return; // Wikipedia etc. stay network-only
+  if (sameOrigin && /\/(tests|bench)\//.test(url.pathname)) return; // test and benchmark pages: always fresh
 
   // App files, fonts, PDF library: saved copy first, network if missing.
   e.respondWith(

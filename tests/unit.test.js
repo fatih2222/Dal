@@ -12,6 +12,54 @@ suite("Hazırlık", (t) => {
   });
 });
 
+suite("Kelime seviyeleri (Aşama 2)", (t) => {
+  const lv = (w) => A("wordLevel")(w), info = (w) => A("wordInfo")(w);
+  t("kalıptan düşen kelimeler geri geldi", () => { eq(lv("according"), 3, "according = B1"); eq(lv("polar"), 4); });
+  t("kök bulma: born, cannot, iyelik, -ves, sıra sayısı, tek harfli ön ek", () => {
+    assert(lv("born") > 0, "born"); eq(lv("cannot"), lv("can"), "cannot");
+    eq(lv("children's"), lv("child"), "children's"); eq(lv("wolves"), lv("wolf"), "wolves");
+    eq(lv("seventh"), lv("seven"), "seventh"); eq(lv("twentieth"), lv("twenty"), "twentieth");
+    eq(lv("e-cigarette"), lv("cigarette"), "e-cigarette");
+  });
+  t("listede olmayan kelimeye sıklıktan seviye, işaretli", () => {
+    const b = info("bacteria"); assert(b && b.freq, "bacteria has a frequency level"); assert(b.l >= 2 && b.l <= 5, "level " + b.l);
+    assert(!info("the").freq, "list words are not marked");
+    eq(info("xqzzv"), null, "nonsense stays off-list");
+  });
+  t("sıklık seviyeleri puan ölçeğini değiştirmiyor", () => {
+    let n = 0; A("LEXMAP").forEach(() => n++);
+    const c = A("FREQMAP"); let overlap = 0; c.forEach((_, w) => { if (A("LEXMAP").has(w)) overlap++; });
+    eq(overlap, 0, "no word in both"); assert(n > 8000, "list size intact");
+  });
+  t("Türkçe ortak kelime en fazla B1, kartta belirtiliyor", () => {
+    const d = info("ideology"); eq(d.l, 3); eq(d.cog, true); eq(d.listL, 4, "B2 in the list");
+    eq(info("ideologies").l, 3, "inflected form too");
+    eq(info("democracy").cog, undefined, "already B1 or easier: untouched");
+    assert(A("unitLevelLabel")({ lemma: "ideology" }).includes("B2, Türkçede de var"), "label");
+    assert(!info("chemical") || !info("chemical").cog, "false friend excluded");
+    eq(info("house").cog, undefined, "easy words untouched");
+  });
+  t("sıklıktan gelen konu terimleri hâlâ hesaba katılmıyor", () => {
+    const p = ["The bacteria live in the soil. Scientists study the bacteria in many places around the world."];
+    const withT = A("measure")(p, 47, ["bacteria"]), without = A("measure")(p, 47, []);
+    assert(withT.n < without.n, `term left out: ${withT.n} < ${without.n}`);
+  });
+  t("cümle başındaki büyük harfli sıklık kelimesi isim sayılıyor", () => {
+    const m = A("measure")(["London is big. We like it."], 47, []);
+    eq(m.n, 5, "London left out: " + m.n);
+  });
+  t("geçmiş yeni ölçekle bir kez yeniden hesaplanıyor", () => {
+    const s = A("state.settings"), lib = A("state.library");
+    const keep = { h: s.history, v: s.scoreV };
+    lib.push({ kind: "text", id: "rs1", finished: true, paragraphs: ["The democracy of the country was strong and the people were happy with it."], target: 47, terms: [], taps: [], result: { text: 99, reader: 99 } });
+    s.history = [{ id: "rs1", text: 99, reader: 99, at: 1 }]; delete s.scoreV;
+    A("rescoreHistory()");
+    assert(s.history[0].text < 99, "rescored: " + s.history[0].text); eq(s.scoreV, A("SCORE_V"));
+    const once = s.history[0].text; s.history[0].text = 1; A("rescoreHistory()"); eq(s.history[0].text, 1, "runs only once");
+    lib.splice(lib.findIndex((d) => d.id === "rs1"), 1); s.history = keep.h; s.scoreV = keep.v;
+  });
+});
+
 suite("Puan hesabı", (t) => {
   const easy = ["The cat is on the bed. My mother has a big house and a small car.", "We go to school every day. I like to play with my friends in the park."];
   const hard = ["The epistemological ramifications of hegemonic discourse necessitate a rigorous interrogation of ostensibly neutral paradigms.", "Contemporary scholarship scrutinises the ideological underpinnings that perpetuate entrenched socioeconomic stratification."];
