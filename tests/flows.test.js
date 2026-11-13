@@ -341,6 +341,35 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     QA("#article .readpanel .chip").find((c) => c.textContent === "Açık").click();
     if (keepTheme == null) localStorage.removeItem("dal-theme"); else localStorage.setItem("dal-theme", keepTheme);
   });
+  t("özel tema: palet, renk seçici, kontrast uyarısı ve kalıcılık", async () => {
+    const keep = { t: localStorage.getItem("dal-theme"), v: localStorage.getItem("dal-theme-vars") };
+    const root = W.document.documentElement;
+    show_home();
+    QA("#abActs .abtn").find((b) => b.getAttribute("aria-label") === "Ayarlar").click();
+    await waitFor(() => Q("#settings").classList.contains("open"));
+    QA("#setRead .chip").find((c) => c.textContent === "Özel").click();
+    eq(root.getAttribute("data-dal"), "custom");
+    eq(root.style.getPropertyValue("--bg"), "#0F1724", "first palette applied");
+    eq(QA("#setRead .swatch").length, 5, "five palettes");
+    QA("#setRead .swatch").find((b) => b.getAttribute("aria-label") === "Kum").click();
+    eq(root.style.getPropertyValue("--bg"), "#FAF6EE");
+    eq(Q('meta[name="theme-color"]').content, "#FAF6EE", "status bar follows");
+    // Text colour almost the background colour: a warning.
+    const inks = QA("#setRead .cpick input");
+    inks[1].value = "#f0ece4"; inks[1].dispatchEvent(new W.Event("input"));
+    assert(Q("#setRead .cwarn").classList.contains("err"), Q("#setRead .cwarn").textContent);
+    eq(root.style.getPropertyValue("--ink"), "#F0ECE4", "applied while choosing");
+    inks[1].value = "#2b2722"; inks[1].dispatchEvent(new W.Event("input"));
+    assert(!Q("#setRead .cwarn").classList.contains("err"), "good contrast again");
+    eq(JSON.parse(localStorage.getItem("dal-theme-vars"))["--bg"], "#FAF6EE", "saved for the next start");
+    // Back to a built-in theme removes the custom colours.
+    QA("#setRead .chip").find((c) => c.textContent === "Açık").click();
+    eq(root.style.getPropertyValue("--bg"), "", "inline colours removed");
+    eq(localStorage.getItem("dal-theme-vars"), null);
+    A("closeSettings()");
+    if (keep.t == null) localStorage.removeItem("dal-theme"); else localStorage.setItem("dal-theme", keep.t);
+    if (keep.v == null) localStorage.removeItem("dal-theme-vars"); else localStorage.setItem("dal-theme-vars", keep.v);
+  });
   t("silme iki dokunuşla yapılıyor", async () => {
     click('#tabs button[data-v="trees"]');
     await waitFor(() => visible("trees"));

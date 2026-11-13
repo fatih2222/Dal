@@ -9,7 +9,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script>if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));</script>
-<script>/* Apply the saved theme before the first paint, so the page doesn't flash the system theme while settings load. */var t="light";try{t=localStorage.getItem("dal-theme")||"light";}catch(e){}if(t!=="auto")document.documentElement.setAttribute("data-dal",t);</script>
+<script>/* Apply the saved theme before the first paint, so the page doesn't flash the system theme while settings load. */var t="light";try{t=localStorage.getItem("dal-theme")||"light";}catch(e){}if(t!=="auto")document.documentElement.setAttribute("data-dal",t);if(t==="custom"){try{var v=JSON.parse(localStorage.getItem("dal-theme-vars")||"{}"),r=document.documentElement;for(var k in v){if(k==="color-scheme")r.style.colorScheme=v[k];else r.style.setProperty(k,v[k]);}var m=document.querySelector('meta[name="theme-color"]');if(m&&v["--bg"])m.content=v["--bg"];}catch(e){}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
@@ -560,6 +560,18 @@ article h1{margin-top:.3rem}
 .seclist,.chaps{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:0 .9rem;box-shadow:var(--sh-1)}
 .seclist li:last-child,.chap:last-child{border-bottom:0}
 .chap .seclist{background:none;border:0;box-shadow:none;padding:0}
+.themeed{margin:.2rem 0 .6rem}
+.themeed .lbl{display:block;color:var(--muted);font-size:.9rem;margin:.5rem 0 .45rem}
+.swatches{display:flex;gap:.6rem;flex-wrap:wrap}
+.swatch{width:2.6rem;height:2.6rem;border-radius:50%;border:2px solid;cursor:pointer;padding:0;box-shadow:var(--sh-1);transition:transform .12s}
+.swatch[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:2px}
+.swatch:active{transform:scale(.92)}
+.cpicks{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.cpick{display:flex;flex-direction:column;align-items:center;gap:.35rem;font-size:.85rem;color:var(--muted);cursor:pointer}
+.cpick input{width:3.2rem;height:3.2rem;border:1px solid var(--line);border-radius:16px;padding:0;background:none;cursor:pointer}
+.cpick input::-webkit-color-swatch-wrapper{padding:4px}
+.cpick input::-webkit-color-swatch{border:0;border-radius:12px}
+.cwarn{margin-top:.8rem}
 .toast{position:fixed;left:50%;bottom:calc(5.2rem + env(safe-area-inset-bottom,0px));transform:translate(-50%,1rem);background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:999px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:40;white-space:nowrap}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion: reduce){.in-push,.in-pop,.in-fade,.flip.turn-out .face,.flip.turn-in .face{animation:none}.setpanel,.setback,.appbar{transition:none}}
@@ -4224,9 +4236,55 @@ function lvlLine(d) {
    Reading settings: text size, line spacing, theme
    ========================================================= */
 const SIZES = [0.9, 1, 1.1, 1.2, 1.35, 1.5];
+// Custom theme: three colours chosen by the reader; every other tone is derived from them, so any choice
+// stays coherent. Whether the background is dark decides how cards, lines and highlights are mixed.
+const THEME_VARS = ["--bg", "--paper", "--card", "--ink", "--muted", "--line", "--rule", "--accent", "--accent-ink", "--accent-soft", "--mark", "--mark-soft", "--danger"];
+const PALETTES = [
+  { name: "Gece mavisi", bg: "#0F1724", ink: "#E6EDF7", accent: "#7FB2FF" },
+  { name: "Siyah", bg: "#000000", ink: "#E8E6E3", accent: "#E0A458" },
+  { name: "Orman", bg: "#F1F5EE", ink: "#1E2A20", accent: "#2F6B3E" },
+  { name: "Kum", bg: "#FAF6EE", ink: "#2B2722", accent: "#B5562B" },
+  { name: "Mürekkep", bg: "#F4F4F6", ink: "#17171C", accent: "#3F51B5" },
+];
+const hexRgb = (h) => { let x = String(h).replace("#", ""); if (x.length === 3) x = x.split("").map((c) => c + c).join(""); const n = parseInt(x, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const rgbHex = (c) => "#" + c.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("").toUpperCase();
+// t is the share of b in the mix.
+const mixHex = (a, b, t) => { const x = hexRgb(a), y = hexRgb(b); return rgbHex(x.map((v, i) => v + (y[i] - v) * t)); };
+// WCAG relative luminance and contrast ratio.
+function luminance(h) { return hexRgb(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0); }
+function contrast(a, b) { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+function themeVars(c) {
+  const dark = luminance(c.bg) < 0.18;
+  const paper = dark ? mixHex(c.bg, "#FFFFFF", 0.06) : mixHex(c.bg, "#FFFFFF", 0.65);
+  return {
+    "--bg": c.bg, "--paper": paper, "--card": paper, "--ink": c.ink,
+    "--muted": mixHex(c.ink, c.bg, 0.38), "--line": mixHex(c.bg, c.ink, dark ? 0.16 : 0.12), "--rule": mixHex(c.bg, c.ink, 0.07),
+    "--accent": c.accent, "--accent-ink": contrast(c.accent, "#FFFFFF") >= contrast(c.accent, "#111111") ? "#FFFFFF" : "#111111",
+    "--accent-soft": mixHex(paper, c.accent, dark ? 0.2 : 0.13),
+    "--mark": dark ? "#7A5622" : "#EDC97F", "--mark-soft": dark ? "#4E3A1E" : "#F5E3BC",
+    "--danger": dark ? "#F2A6A6" : "#A3333D", "color-scheme": dark ? "dark" : "light",
+  };
+}
+// The phone's status bar takes the background colour of whatever theme is showing.
+function syncThemeColor() {
+  const m = document.querySelector('meta[name="theme-color"]');
+  const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+  if (m && bg) m.content = bg;
+}
 function readPrefs() {
   const s = state.settings;
-  s.read = Object.assign({ size: 1, lh: 1.78, theme: (() => { try { return localStorage.getItem("dal-theme") || "light"; } catch (e) { return "light"; } })() }, s.read || {});
+  // Fill in defaults on the same object: panels hold on to it, so it must never be swapped for a copy.
+  s.read = s.read || {};
+  if (s.read.size == null) s.read.size = 1;
+  if (s.read.lh == null) s.read.lh = 1.78;
+  if (!s.read.theme) s.read.theme = (() => { try { return localStorage.getItem("dal-theme") || "light"; } catch (e) { return "light"; } })();
+  // A custom theme without its colours (settings lost, browser storage kept): take the stored colours, else the first palette.
+  if (s.read.theme === "custom" && !(s.read.custom && s.read.custom.bg && s.read.custom.ink && s.read.custom.accent)) {
+    let v = null;
+    try { v = JSON.parse(localStorage.getItem("dal-theme-vars") || "null"); } catch (e) {}
+    const p = PALETTES[0];
+    s.read.custom = v && v["--bg"] ? { bg: v["--bg"], ink: v["--ink"], accent: v["--accent"] } : { bg: p.bg, ink: p.ink, accent: p.accent };
+  }
   return s.read;
 }
 function applyRead() {
@@ -4236,7 +4294,15 @@ function applyRead() {
   // Own attribute: the Claude viewer sets data-theme from its own light/dark mode, which must not override the chosen theme.
   if (r.theme === "auto") root.removeAttribute("data-dal");
   else root.setAttribute("data-dal", r.theme);
-  try { localStorage.setItem("dal-theme", r.theme); } catch (e) {}
+  const vars = r.theme === "custom" ? themeVars(r.custom || PALETTES[0]) : null;
+  THEME_VARS.forEach((k) => root.style.removeProperty(k));
+  root.style.colorScheme = "";
+  if (vars) Object.entries(vars).forEach(([k, v]) => { if (k === "color-scheme") root.style.colorScheme = v; else root.style.setProperty(k, v); });
+  try {
+    localStorage.setItem("dal-theme", r.theme);
+    if (vars) localStorage.setItem("dal-theme-vars", JSON.stringify(vars)); else localStorage.removeItem("dal-theme-vars");
+  } catch (e) {}
+  syncThemeColor();
 }
 function renderReadPanel(panel) {
   const r = readPrefs();
@@ -4252,7 +4318,51 @@ function renderReadPanel(panel) {
   const si = Math.max(0, SIZES.indexOf(r.size));
   row("Yazı", [chip("A−", false, () => { r.size = SIZES[Math.max(0, si - 1)]; }), el("span", "rsval", `%${round(r.size * 100)}`), chip("A+", false, () => { r.size = SIZES[Math.min(SIZES.length - 1, si + 1)]; })]);
   row("Satır aralığı", [["Dar", 1.6], ["Normal", 1.78], ["Geniş", 2]].map(([l, v]) => chip(l, r.lh === v, () => { r.lh = v; })));
-  row("Tema", [["auto", "Otomatik"], ["light", "Açık"], ["dark", "Koyu"], ["sepia", "Sepya"]].map(([k, l]) => chip(l, r.theme === k, () => { r.theme = k; })));
+  row("Tema", [["auto", "Otomatik"], ["light", "Açık"], ["dark", "Koyu"], ["sepia", "Sepya"], ["custom", "Özel"]].map(([k, l]) => chip(l, r.theme === k, () => {
+    r.theme = k;
+    if (k === "custom" && !r.custom) { const p = PALETTES[0]; r.custom = { bg: p.bg, ink: p.ink, accent: p.accent }; }
+  })));
+  if (r.theme === "custom") panel.append(themeEditor(r, panel));
+}
+// Ready palettes to start from, three colour pickers that apply as they move, and a contrast check.
+function themeEditor(r, panel) {
+  const ed = el("div", "themeed");
+  const sw = el("div", "swatches");
+  PALETTES.forEach((p) => {
+    const b = el("button", "swatch");
+    b.type = "button";
+    b.setAttribute("aria-label", p.name);
+    b.title = p.name;
+    b.style.background = `linear-gradient(135deg, ${p.bg} 0 55%, ${p.accent} 55% 100%)`;
+    b.style.borderColor = p.ink;
+    b.setAttribute("aria-pressed", String(r.custom.bg === p.bg && r.custom.ink === p.ink && r.custom.accent === p.accent));
+    b.onclick = () => { r.custom = { bg: p.bg, ink: p.ink, accent: p.accent }; applyRead(); saveSettings(); haptic(); renderReadPanel(panel); };
+    sw.append(b);
+  });
+  const w = el("p", "hint cwarn");
+  const warn = () => {
+    const c1 = contrast(r.custom.ink, r.custom.bg), c2 = contrast(r.custom.accent, r.custom.bg);
+    const f = (x) => x.toFixed(1).replace(".", ",");
+    w.textContent = c1 < 4.5 ? `Yazı ile arka plan arasındaki kontrast düşük (${f(c1)}:1). Okumak yorucu olabilir; en az 4,5:1 önerilir.`
+      : c2 < 3 ? `Vurgu rengi arka planda zor seçiliyor (${f(c2)}:1); en az 3:1 önerilir.`
+      : `Kontrast iyi: yazı ${f(c1)}:1, vurgu ${f(c2)}:1.`;
+    w.classList.toggle("err", c1 < 4.5 || c2 < 3);
+  };
+  const pick = (key, label) => {
+    const lab = el("label", "cpick");
+    const inp = el("input");
+    inp.type = "color";
+    inp.value = r.custom[key];
+    inp.oninput = () => { r.custom[key] = inp.value.toUpperCase(); applyRead(); warn(); sw.querySelectorAll(".swatch").forEach((b) => b.setAttribute("aria-pressed", "false")); };
+    inp.onchange = () => saveSettings();
+    lab.append(inp, el("span", null, label));
+    return lab;
+  };
+  const pk = el("div", "cpicks");
+  pk.append(pick("bg", "Arka plan"), pick("ink", "Yazı"), pick("accent", "Vurgu"));
+  warn();
+  ed.append(el("span", "lbl", "Hazır paletler"), sw, el("span", "lbl", "Kendi renklerin"), pk, w);
+  return ed;
 }
 
 /* =========================================================

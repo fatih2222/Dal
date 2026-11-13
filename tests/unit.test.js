@@ -1,6 +1,45 @@
 // Unit tests: pure logic and the app's own layers, against a fresh app in test mode.
 "use strict";
 
+suite("Özel tema renkleri", (t) => {
+  t("kontrast oranı WCAG ile aynı", async () => {
+    if (!W) await loadApp();
+    near(A("contrast")("#000000", "#FFFFFF"), 21, 0.01, "black on white");
+    near(A("contrast")("#777777", "#FFFFFF"), 4.48, 0.02, "mid grey");
+    near(A("contrast")("#FFFFFF", "#FFFFFF"), 1, 1e-9, "same colour");
+  });
+  t("renk karıştırma", () => {
+    eq(A("mixHex")("#000000", "#FFFFFF", 0.5), "#808080");
+    eq(A("mixHex")("#123456", "#ABCDEF", 0), "#123456");
+  });
+  t("koyu arka planda tonlar koyu temaya göre türetiliyor", () => {
+    const v = A("themeVars")({ bg: "#0F1724", ink: "#E6EDF7", accent: "#7FB2FF" });
+    eq(v["color-scheme"], "dark"); eq(v["--bg"], "#0F1724"); eq(v["--accent-ink"], "#111111", "dark text on a light accent");
+    assert(A("luminance")(v["--paper"]) > A("luminance")("#0F1724"), "cards a little lighter than the background");
+  });
+  t("açık arka planda açık temaya göre", () => {
+    const v = A("themeVars")({ bg: "#FAF6EE", ink: "#2B2722", accent: "#B5562B" });
+    eq(v["color-scheme"], "light"); eq(v["--accent-ink"], "#FFFFFF", "white text on a dark accent");
+    assert(A("contrast")(v["--muted"], v["--bg"]) > 3, "muted text stays readable");
+  });
+  t("renkleri kaybolmuş özel tema çökmüyor, kayıtlı ya da varsayılan renk alıyor", () => {
+    const s = A("state.settings"), keep = JSON.stringify(s.read || null);
+    s.read = { size: 1, lh: 1.78, theme: "custom" };
+    const r = A("readPrefs()");
+    assert(r.custom && r.custom.bg && r.custom.ink && r.custom.accent, JSON.stringify(r.custom));
+    const panel = W.document.createElement("div");
+    A("renderReadPanel")(panel);
+    assert(panel.querySelector(".cpicks"), "editor drawn");
+    s.read = JSON.parse(keep) || undefined; if (!s.read) delete s.read;
+  });
+  t("hazır paletlerin hepsi okunabilir", () => {
+    A("PALETTES").forEach((p) => {
+      assert(A("contrast")(p.ink, p.bg) >= 7, p.name + " text");
+      assert(A("contrast")(p.accent, p.bg) >= 3, p.name + " accent");
+    });
+  });
+});
+
 // Words of a text that the score counts (the app's own token order).
 function countedWords(paras) {
   const m = A("measure")(paras, 47, []);
