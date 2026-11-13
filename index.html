@@ -234,6 +234,10 @@ body.picking article{padding-bottom:40vh}
 #review h1{font-family:Literata,Georgia,serif;font-weight:600;font-size:clamp(1.6rem,1.2rem + 1.6vw,2.2rem);margin:.6rem 0 .4rem}
 .rvcard{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:12px;padding:1.1rem 1.2rem;margin-top:1rem}
 .rvprog{color:var(--muted);font-size:.9rem}
+.ptbars{display:grid;grid-template-columns:auto 1fr auto;gap:.35rem .6rem;align-items:center;margin:.8rem 0;font-size:.9rem}
+.ptbar{height:8px;background:var(--line);border-radius:3px;overflow:hidden}
+.ptbar i{display:block;height:100%;background:var(--accent)}
+.ptres{font-family:Literata,Georgia,serif;font-size:1.6rem;font-weight:600;margin:.2rem 0}
 .rvword{font-family:Literata,Georgia,serif;font-size:2rem;font-weight:600;margin:.3rem 0 .6rem}
 .rvsent{font-family:Literata,Georgia,serif;font-size:1.1rem;line-height:1.75;margin:.4rem 0}
 .rvans{margin-top:.8rem;padding-top:.8rem;border-top:1px dashed var(--line)}
@@ -454,6 +458,7 @@ ul.nblist:empty,.lib ul:empty{display:none}
     <div class="lvcard">
       <div class="gauge" id="gauge" aria-hidden="true"></div>
       <p class="levelinfo" id="levelInfo"></p>
+      <button class="linkbtn" id="ptOpen" type="button">Kelime testiyle seviyeni ölç (4 dk)</button>
       <details class="lvmore">
         <summary>Seviye ve uzunluğu değiştir</summary>
         <div class="row" id="readerRow"><span class="lbl">Okur seviyen yanlış görünüyorsa düzelt</span><label class="scorein">Puan <input id="readerIn" type="number" min="5" max="95" step="1" inputmode="numeric" aria-label="Okur seviyen"></label><button class="chip" id="readerSet" type="button">Güncelle</button><span class="hint" id="readerMsg" style="flex-basis:100%;margin:0"></span></div>
@@ -503,6 +508,8 @@ ul.nblist:empty,.lib ul:empty{display:none}
   <section id="notebook" hidden></section>
 
   <section id="review" hidden></section>
+
+  <section id="placement" hidden></section>
 
   <section id="importv" hidden>
     <h1>Kendi metnini getir</h1>
@@ -718,6 +725,25 @@ function scoreAt(counts, n, q) {
   }
   return 100;
 }
+// Multi-word entries of the same lists (eke out, global warming, de facto). Inside a text such a phrase counts once,
+// at the phrase's level. Phrases made only of A1 words and rated B1 or lower (out of, on to, have to) are left to
+// their words: they are common, and counting them as units would mostly misfire. See bench/build_phrases.py.
+const PHRASES = {"A1": "all right|cd player|credit card|dining room|each other|good afternoon|good morning|good night|have to|ice cream|last name|living room|mobile phone|swimming pool|tee shirt", "A2": "alarm clock|board game|bus station|bus stop|capital letter|car park|classical music|department store|digital camera|driving licence|fast food|first name|good looking|grocery store|half price|high school|hip hop|id card|left hand|main course|make up|mineral water|mp player|next to|no one|olive oil|out of|pen friend|petrol station|police officer|police station|post office|right hand|shop assistant|sitting room|soft drink|sports center|sports centre|swimming costume|table tennis|text message|tour guide|traffic light|video game|washing machine|washing up|web page|well known", "B1": "according to|air conditioning|air force|bank account|because of|brand new|cd rom|central heating|chat show|check in|check in counter|check in desk|chest of drawers|chewing gum|common sense|definite article|disc jockey|disk jockey|duty free|easy going|exchange rate|extreme sports|face to face|film maker|fire station|first floor|first lady|frying pan|full stop|full time|ground floor|hand held|hard working|heart attack|ice hockey|ice skating|identity card|indefinite article|instead of|message board|middle aged|mixing bowl|modal verb|navy blue|next door|old fashioned|on to|ought to|out of date|part time|per cent|phrasal verb|pocket money|primary school|public transport|question mark|remote control|science fiction|second hand|secondary school|self service|soap opera|social networking|take off|traffic jam|travel agent|up to date|used to|vice president|video clip|weather forecast|well dressed", "B2": "bad tempered|brother in law|carbon dioxide|carbon footprint|carbon monoxide|climate change|daughter in law|de facto|debit card|environmentally friendly|exclamation mark|father in law|fed up|fire brigade|first language|first person|global warming|grown up|hard drive|health care|heart warming|hi tech|high tech|human rights|inverted commas|junk food|last minute|long distance|long term|martial art|mother in law|native speaker|net surfer|non smoking|owing to|point of view|polar bear|prime minister|real estate|rush hour|second person|self confidence|self confident|semi final|short term|sister in law|so called|son in law|steering wheel|stock market|third person|upside down|virtual reality|well balanced|well built|well organised|well organized|well paid|worn out", "C1": "apt to|bulk up|cost effective|mark up|pertain to|self conscious|self worth|turn to", "C2": "ad lib|all encompassing|bona fide|dole out|eke out|glory in|mull over|muscle bound|self aggrandisement|self aggrandizement|side step|taste maker|vis a vis"};
+let PHRASE_INDEX = null;
+function phraseIndex() {
+  if (PHRASE_INDEX) return PHRASE_INDEX;
+  PHRASE_INDEX = new Map();
+  LV.forEach((lv, n) => (PHRASES[lv] || "").split("|").forEach((p) => {
+    const ws = p.split(" ").filter(Boolean);
+    if (ws.length < 2) return;
+    if (n + 1 <= 3 && ws.every((w) => wordLevel(w) === 1)) return;
+    const list = PHRASE_INDEX.get(ws[0]) || [];
+    list.push({ ws, l: n + 1, key: p });
+    PHRASE_INDEX.set(ws[0], list);
+  }));
+  PHRASE_INDEX.forEach((list) => list.sort((a, b) => b.ws.length - a.ws.length));
+  return PHRASE_INDEX;
+}
 // Level 1–6 = A1–C2, 7 = in no list. Names, numbers and off-list topic terms are left out.
 // Words above the target's level count once, however often they appear.
 function measure(paragraphs, target, terms) {
@@ -730,8 +756,11 @@ function measure(paragraphs, target, terms) {
   const seen = new Set();
   const above = new Map();
   const atRef = new Map();
+  const index = phraseIndex();
   let n = 0;
   paragraphs.forEach((para) => splitSentences(para).forEach((s) => {
+    // First pass: each word's level, or why it is left out.
+    const toks = [];
     let first = true;
     for (const m of s.matchAll(WORD_RE)) {
       const raw = m[0], isFirst = first;
@@ -746,10 +775,27 @@ function measure(paragraphs, target, terms) {
         else if (cap && (!isFirst || !info || info.freq)) excluded = true;
         else if ((!info || info.freq) && termSet.has(low)) excluded = true;
       }
-      counted.push(!excluded);
-      if (excluded) continue;
-      const l = info ? info.l : 7;
-      const key = info ? info.key : low;
+      toks.push({ low, info, excluded });
+    }
+    // Second pass: phrases (any inflection of their words, the longest match first).
+    for (let i = 0; i < toks.length; i++) {
+      if (toks[i].excluded || toks[i].inUnit) continue;
+      const starts = candidates(toks[i].low).flatMap((c) => index.get(c) || []);
+      for (const p of starts) {
+        if (i + p.ws.length > toks.length) continue;
+        let ok = true;
+        for (let k = 1; k < p.ws.length && ok; k++) { const t = toks[i + k]; ok = !t.excluded && candidates(t.low).includes(p.ws[k]); }
+        if (!ok || !candidates(toks[i].low).includes(p.ws[0])) continue;
+        toks[i].unit = p;
+        for (let k = 1; k < p.ws.length; k++) toks[i + k].inUnit = true;
+        break;
+      }
+    }
+    for (const t of toks) {
+      counted.push(!t.excluded);
+      if (t.excluded || t.inUnit) continue;
+      const l = t.unit ? t.unit.l : t.info ? t.info.l : 7;
+      const key = t.unit ? t.unit.key : t.info ? t.info.key : t.low;
       if (l > ref) { above.set(key, l); if (seen.has(key)) continue; seen.add(key); }
       if (l === ref) atRef.set(key, (atRef.get(key) || 0) + 1);
       n++;
@@ -1358,8 +1404,9 @@ function renderLevels() {
   });
   $("#readerIn").placeholder = String(round(rl));
   const n = s.history.filter(afterReset).length;
+  const from = s.levelReset && s.levelReset.src === "test" ? "Seviye testindeki" : "Elle girdiğin";
   const basis = s.levelReset
-    ? (n ? `Elle girdiğin ${s.levelReset.value} değerinden sonra bitirdiğin ${Math.min(5, n)} metne dayanıyor.` : `Elle girdiğin ${s.levelReset.value} değerinden başlıyor; bitirdiğin metinlerle güncellenecek.`)
+    ? (n ? `${from} ${s.levelReset.value} değerinden sonra bitirdiğin ${Math.min(5, n)} metne dayanıyor.` : `${from} ${s.levelReset.value} değerinden başlıyor; bitirdiğin metinlerle güncellenecek.`)
     : n ? `Son ${Math.min(5, n)} bitirilmiş metne dayanıyor.` : `Henüz bitirilmiş metin yok; başlangıç değeri ${s.start} seviyesinden geliyor.`;
   $("#levelInfo").textContent = s.mode === "auto"
     ? `Yeni metin okur seviyende yazılır. ${basis}`
@@ -1511,7 +1558,7 @@ async function deleteDocs(ids) {
    Views
    ========================================================= */
 function show(view) {
-  ["home", "loading", "reader", "tree", "trees", "library", "notebook", "review", "importv", "importdoc"].forEach((v) => ($("#" + v).hidden = v !== view));
+  ["home", "loading", "reader", "tree", "trees", "library", "notebook", "review", "importv", "importdoc", "placement"].forEach((v) => ($("#" + v).hidden = v !== view));
   document.body.dataset.view = view;
   const tab = view === "reader" && state.doc && state.doc.importId ? "library"
     : { home: "home", loading: "home", reader: "home", tree: "trees", trees: "trees", library: "library", notebook: "notebook", review: "review", importv: "home", importdoc: "library" }[view];
@@ -1668,6 +1715,17 @@ function sentStats(paragraphs) {
   paragraphs.forEach((p) => splitSentences(p).forEach((s) => lens.push((s.match(WORD_RE) || []).length)));
   const sum = lens.reduce((a, b) => a + b, 0);
   return { n: lens.length, avg: lens.length ? round((sum / lens.length) * 10) / 10 : 0, max: Math.max(0, ...lens), long: lens.filter((x) => x >= 25).length };
+}
+// Sentence length as a second, separate measure of difficulty. Reference: median words per sentence in the
+// OneStopEnglish corpus (Elementary 16.5, Intermediate 19.6, Advanced 22.1); the cut points are the midpoints.
+// On that corpus it adds to the word score (bench/run.html), but it stays apart so the score keeps its meaning.
+function sentenceLine(paragraphs) {
+  const st = sentStats(paragraphs);
+  if (!st.n) return "";
+  const kind = st.avg < 18 ? "kısa" : st.avg <= 21 ? "orta uzunlukta" : "uzun";
+  const ref = st.avg < 18 ? "kolay" : st.avg <= 21 ? "orta" : "ileri";
+  const longPart = st.long ? `, ${st.long} tanesi 25 kelimeden uzun` : "";
+  return `Cümleler ${kind}: ortalama ${String(st.avg).replace(".", ",")} kelime (${st.n} cümle${longPart}). Bu, ${ref} seviye okuma metinlerindeki cümle uzunluğuna denk geliyor. Bu ölçü kelime puanına katılmaz.`;
 }
 // Hidden diagnostics stored with each text, for later audits.
 function buildDiag(target, draft, revised, paragraphs, terms, units, branches, tGen, ctx) {
@@ -2224,7 +2282,8 @@ function renderEnd() {
   sum.append(el("span", "ptitle", `Metin puanı ${round(m.score)} (${m.score >= 100 ? "liste dışı" : scoreName(m.score)})`), bar);
   prof.append(sum, leg,
     el("p", null, `Bu metnin %95’ini anlamak için ölçekte ${round(m.score)} noktasına kadar kelime bilmek gerekiyor. Hedef ${d.target} idi.`),
-    el("p", "src", "İsimler, sayılar ve listede olmayan konu terimleri hesaba katılmadı; seviyenin üstündeki kelimeler bir kez sayıldı. Seviyeler: CEFR-J Wordlist 1.5 (Tono Lab, TUFS), Octanove Vocabulary Profile C1/C2 (CC BY-SA 4.0), Coxhead Academic Word List. Listelerde olmayan kelimeler için seviye, wordfreq 3.1 (Robyn Speer, CC BY-SA 4.0) sıklık verisinden tahmin edilir."));
+    el("p", null, sentenceLine(d.paragraphs)),
+    el("p", "src", "İsimler, sayılar ve listede olmayan konu terimleri hesaba katılmadı; seviyenin üstündeki kelimeler bir kez sayıldı; listelerdeki kalıplar (fed up, global warming) tek birim sayıldı; Türkçede de olan kelimeler (ideoloji, bakteri) en fazla B1 sayıldı. Seviyeler: CEFR-J Wordlist 1.5 (Tono Lab, TUFS), Octanove Vocabulary Profile C1/C2 (CC BY-SA 4.0), Coxhead Academic Word List. Listelerde olmayan kelimeler için seviye, wordfreq 3.1 (Robyn Speer, CC BY-SA 4.0) sıklık verisinden tahmin edilir."));
   box.append(prof);
 
   // Sources
@@ -3025,6 +3084,104 @@ function answerReview(w, ok) {
   saveNb();
   state.rv.i++;
   renderReview();
+}
+
+/* =========================================================
+   Placement test: yes/no vocabulary checklist with pseudowords
+   (Meara and Buxton 1987; the method behind LexTALE and X_Lex).
+   Ten random words from each list level and twenty pseudowords. Each level's "yes" rate is corrected for
+   guessing with the pseudoword "yes" rate, (h − f) / (1 − f), and the levels are made non-increasing.
+   Result: the share of each level the reader knows, times that level's width on the 0–100 scale, summed —
+   the place on the list that matches how many listed words the reader knows. A starting point only:
+   finished texts keep adjusting it.
+   ========================================================= */
+const PSEUDO = ["abiss", "ablarazy", "aclutiole", "adcasse", "adnesse", "agoolus", "aiselass", "alexprous", "alitefulf", "andatting", "annock", "appirmin", "appornme", "arrichiad", "astivespe", "athron", "awartue", "babulse", "baltaide", "barrect", "beashary", "berbilit", "berrisive", "bewcally", "bicion", "blucking", "bootivel", "boutly", "bratic", "bruct", "bulecrep", "bultion", "cablize", "catic", "cationy", "chasive", "clabhon", "cluarnic", "clucattle", "coasser", "cocroust", "cofercy", "cogritral", "coloweass", "concheld", "conquask", "copince", "corefum", "couressit", "covernin", "cregray", "culunilly", "cybelant", "deburatic", "decoveron", "defulgile", "dolwin", "domeng", "eadarger", "earmarate", "easturly", "ecilong", "elamewor", "emoracal", "enchan", "entickly", "envoush", "eregate", "etwiver", "exhanize", "experalky", "explegaus", "exprisurn", "extring", "fainewor", "farchart", "fictic", "figuirent", "fixtror", "flenscon", "frafer", "gainvin", "gourionse", "graccol", "grapperb", "hadozy", "haket", "halumen", "hamamory", "haraily", "heastinit", "hememped", "hiname", "holial", "hottegan", "ilism", "imediste", "imetang", "inaloper", "induall", "ineast", "inithray", "innoyal", "jainge", "jaingo", "jectick", "knoment", "lanculse", "larceparm", "lativean", "latonse", "legiewsce", "lerling", "lisor", "locenturb", "loorsid", "mageress", "mangence", "mayther", "memateme", "mittrar", "mobelful", "molopeate", "naloquat", "nerradol", "nestant", "normodure", "nortial", "obionsin", "obleater", "obsicsive", "ofteash", "olivast", "onteded", "ophorn", "opospeng", "opownt", "orgarmish", "ormary", "oveyeste", "pacheme", "pannised", "paticin", "patoney", "pearrion", "penity", "perfen", "persug", "plarize", "polene", "poony", "prevaste", "priands", "pridditer", "probon", "prokener", "prolleage", "propate", "prourry", "publecker", "pulart", "pulsic", "pulusion", "puratimed", "quitrass", "raflive", "rassishon", "ratinen", "reaclow", "reckey", "reepar", "regairth", "regial", "rejun", "resoudy", "retchasit", "rhipte", "rhounce", "rogarally", "ropplass", "rovermely", "rummic", "sactufful", "sauggical", "scaudin", "scrode", "sembey", "shiblung", "shonly", "siddran", "sidomant", "sionvis", "skyale", "slety", "snaphur", "solaty", "spitimale", "splousid", "staluss", "stexpler", "stical", "stormiss", "strodle", "subbad", "suracky", "surang", "syliming", "tagess", "tervitown", "tevast", "thesuma", "thornar", "thospeck", "thremunle", "ticaunt", "torasey", "tormly", "undice", "uragner", "verment", "vibler", "vignion", "whely", "wourgel", "yogous", "yumorge"];
+const PT_PER_LEVEL = 10, PT_PSEUDO = 20, PT_MAX_FALSE = 0.3;
+function ptItems() {
+  const pools = [[], [], [], [], [], [], []];
+  LEXMAP.forEach((l, w) => {
+    if (!/^[a-z]{4,12}$/.test(w) || COGNATES.has(w)) return;
+    const i = wordInfo(w);
+    if (i && i.l === l && !i.cog && !i.freq) pools[l].push(w);
+  });
+  const items = [];
+  for (let l = 1; l <= 6; l++) shuffled(pools[l]).slice(0, PT_PER_LEVEL).forEach((w) => items.push({ w, l }));
+  // A pseudoword the app can split into real parts (farchart = far + chart) would be a fair "yes": leave it out.
+  shuffled(PSEUDO.filter((w) => !wordInfo(w))).slice(0, PT_PSEUDO).forEach((w) => items.push({ w, l: 0 }));
+  return shuffled(items);
+}
+// Pool-adjacent-violators: the closest non-increasing sequence (knowledge should not rise with level).
+function nonIncreasing(a) {
+  const blocks = a.map((v) => ({ sum: v, n: 1 }));
+  for (let i = 0; i < blocks.length - 1;) {
+    if (blocks[i].sum / blocks[i].n < blocks[i + 1].sum / blocks[i + 1].n) {
+      blocks[i] = { sum: blocks[i].sum + blocks[i + 1].sum, n: blocks[i].n + blocks[i + 1].n };
+      blocks.splice(i + 1, 1);
+      if (i > 0) i--;
+    } else i++;
+  }
+  return blocks.flatMap((b) => Array(b.n).fill(b.sum / b.n));
+}
+function ptScore(answers) {
+  const yes = [0, 0, 0, 0, 0, 0, 0], tot = [0, 0, 0, 0, 0, 0, 0];
+  answers.forEach((a) => { tot[a.l]++; if (a.yes) yes[a.l]++; });
+  const f = tot[0] ? yes[0] / tot[0] : 0;
+  const raw = [1, 2, 3, 4, 5, 6].map((l) => (tot[l] ? yes[l] / tot[l] : 0));
+  const corrected = raw.map((h) => (f >= 1 ? 0 : Math.max(0, Math.min(1, (h - f) / (1 - f)))));
+  const k = nonIncreasing(corrected);
+  let value = 0;
+  for (let l = 1; l <= 6; l++) value += k[l - 1] * (BOUND[l] - BOUND[l - 1]);
+  return { raw, k, f, value: Math.max(5, Math.min(95, value)), reliable: f <= PT_MAX_FALSE };
+}
+$("#ptOpen").onclick = () => { state.pt = null; show("placement"); renderPlacement(); };
+function renderPlacement() {
+  const box = $("#placement"), pt = state.pt;
+  box.innerHTML = "";
+  box.append(el("h1", null, "Seviye testi"));
+  const card = el("div", "rvcard");
+  const acts = el("div", "acts");
+  if (!pt) {
+    card.append(el("p", null, `Sana ${6 * PT_PER_LEVEL + PT_PSEUDO} kelime göstereceğim. Anlamını biliyorsan “Biliyorum”, bilmiyorsan ya da emin değilsen “Bilmiyorum” de.`),
+      el("p", "hint", "Bazıları İngilizceye benzeyen uydurma kelimeler. Onlara “Biliyorum” dersen sonuç buna göre düzeltilir; tahmin etmeden, dürüstçe cevap ver. Yaklaşık 4 dakika sürer."));
+    acts.append(actBtn("Başla", () => { state.pt = { items: ptItems(), i: 0, answers: [] }; renderPlacement(); }, true), actBtn("Vazgeç", () => show("home")));
+    card.append(acts);
+  } else if (pt.i < pt.items.length) {
+    const it = pt.items[pt.i];
+    const answer = (yes) => { pt.answers.push({ l: it.l, w: it.w, yes }); pt.i++; renderPlacement(); };
+    card.append(el("div", "rvprog", `${pt.i + 1} / ${pt.items.length}`), el("div", "rvword", it.w));
+    acts.append(actBtn("Biliyorum", () => answer(true), true), actBtn("Bilmiyorum", () => answer(false)));
+    const quit = el("button", "linkbtn", "Testi bırak");
+    quit.type = "button";
+    quit.onclick = () => { state.pt = null; show("home"); };
+    card.append(acts, quit);
+  } else {
+    const r = pt.result || (pt.result = ptScore(pt.answers));
+    const v = round(r.value);
+    card.append(el("p", "hint", "Sonuç"), el("p", "ptres", `${v} (${scoreName(v)})`));
+    const bars = el("div", "ptbars");
+    LV.forEach((l, i) => {
+      const b = el("div", "ptbar"), fill = el("i");
+      fill.style.width = round(r.k[i] * 100) + "%";
+      b.append(fill);
+      bars.append(el("span", null, l), b, el("span", null, "%" + round(r.k[i] * 100)));
+    });
+    const fa = round(r.f * PT_PSEUDO);
+    card.append(el("p", null, "Her seviyede bildiğin kelimelerin tahmini oranı:"), bars,
+      el("p", "hint", `Uydurma kelimelerden ${fa} tanesine “Biliyorum” dedin; sonuç buna göre düzeltildi.`));
+    if (!r.reliable) card.append(el("p", "err", "Uydurma kelimelerin çoğuna “Biliyorum” dedin, bu yüzden sonuç güvenilir değil. Testi yeniden yapmanı öneririm."));
+    card.append(el("p", "hint", "Bu bir başlangıç noktası. Kaydedersen okur seviyen bu değerden başlar; bitirdiğin metinlerle güncellenmeye devam eder."));
+    acts.append(actBtn(r.reliable ? "Seviyem olarak kaydet" : "Yine de kaydet", () => {
+      const s = state.settings;
+      s.levelReset = { at: Date.now(), value: v, src: "test" };
+      s.placement = { at: Date.now(), value: v, k: r.k.map((x) => round(x * 100) / 100), f: round(r.f * 100) / 100 };
+      saveSettings();
+      renderLevels();
+      state.pt = null;
+      show("home");
+    }, r.reliable), actBtn("Yeniden yap", () => { state.pt = { items: ptItems(), i: 0, answers: [] }; renderPlacement(); }), actBtn("Kaydetmeden çık", () => { state.pt = null; show("home"); }));
+    card.append(acts);
+  }
+  box.append(card);
 }
 
 // First run: build the notebook from words already tapped in saved texts.

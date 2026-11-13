@@ -60,6 +60,56 @@ suite("Kelime seviyeleri (Aşama 2)", (t) => {
   });
 });
 
+suite("Kalıp ifadeler ve cümle uzunluğu (Aşama 3)", (t) => {
+  t("kalıp tek birim, kalıbın seviyesiyle; çekimli hali de bulunuyor", () => {
+    const m = A("measure")(["He was fed up, so he eked out a living."], 47, []);
+    const keys = m.above.map(([k]) => k);
+    assert(keys.includes("fed up") && keys.includes("eke out"), JSON.stringify(m.above));
+  });
+  t("A1 kelimelerden oluşan yaygın diziler birim sayılmıyor", () => {
+    const m = A("measure")(["We got out of the car and moved on to the house."], 47, []);
+    eq(m.n, 12, "every word counted on its own");
+  });
+  t("isim içindeki kalıp birim sayılmıyor", () => {
+    const a = A("measure")(["They met at Global Warming House today."], 47, []);
+    assert(!a.above.some(([k]) => k === "global warming"), "capitalised words are names");
+  });
+  t("cümle uzunluğu satırı", () => {
+    assert(A("sentenceLine")(["One two three. Four five six seven."]).includes("kısa"), "short");
+    const long = Array.from({ length: 30 }, (_, i) => "word" + i).join(" ") + ".";
+    assert(A("sentenceLine")([long]).includes("uzun"), "long");
+  });
+});
+
+suite("Seviye testi (Aşama 4)", (t) => {
+  t("80 madde: seviye başına 10 gerçek kelime, 20 uydurma", () => {
+    const items = A("ptItems()");
+    eq(items.length, 80);
+    for (let l = 0; l <= 6; l++) eq(items.filter((x) => x.l === l).length, l ? 10 : 20, "level " + l);
+    assert(items.every((x) => !A("COGNATES").has(x.w)), "no cognates");
+    assert(items.filter((x) => x.l === 0).every((x) => !A("wordInfo")(x.w)), "pseudowords are not words");
+  });
+  t("uydurma kelimeler gerçek değil", () => {
+    const p = A("PSEUDO");
+    assert(p.filter((w) => !A("wordInfo")(w)).length >= 200, "usable pool " + p.length);
+    assert(p.every((w) => !A("LEXMAP").has(w) && !A("FREQMAP").has(w)), "none listed");
+  });
+  t("puanlama: B2'ye kadar biliyorsa ~78, hiç bilmiyorsa en alt", () => {
+    const ans = (upTo, fa) => { const a = []; for (let l = 1; l <= 6; l++) for (let i = 0; i < 10; i++) a.push({ l, yes: l <= upTo }); for (let i = 0; i < 20; i++) a.push({ l: 0, yes: i < fa }); return a; };
+    near(A("ptScore")(ans(4, 0)).value, A("BOUND")[4], 0.01, "A1–B2 known");
+    eq(A("ptScore")(ans(0, 0)).value, 5, "floor");
+    assert(A("ptScore")(ans(6, 0)).value <= 95, "ceiling");
+  });
+  t("tahmin düzeltmesi ve güvenilirlik", () => {
+    const a = []; for (let l = 1; l <= 6; l++) for (let i = 0; i < 10; i++) a.push({ l, yes: i < 5 }); for (let i = 0; i < 20; i++) a.push({ l: 0, yes: i < 10 });
+    const r = A("ptScore")(a);
+    near(r.f, 0.5, 1e-9); assert(r.k.every((x) => x === 0), "50% yes with 50% false alarms = no knowledge"); eq(r.reliable, false);
+  });
+  t("seviyeler azalan sıraya getiriliyor", () => {
+    eq(JSON.stringify(A("nonIncreasing")([1, 0.6, 0.8, 0.2, 0.3, 0])), JSON.stringify([1, 0.7, 0.7, 0.25, 0.25, 0]));
+  });
+});
+
 suite("Puan hesabı", (t) => {
   const easy = ["The cat is on the bed. My mother has a big house and a small car.", "We go to school every day. I like to play with my friends in the park."];
   const hard = ["The epistemological ramifications of hegemonic discourse necessitate a rigorous interrogation of ostensibly neutral paradigms.", "Contemporary scholarship scrutinises the ideological underpinnings that perpetuate entrenched socioeconomic stratification."];

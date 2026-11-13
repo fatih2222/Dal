@@ -260,6 +260,29 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     Q("#readerIn").value = ""; click("#readerSet");
     assert(Q("#readerMsg").textContent.includes("5 ile 95"), "validation message");
   });
+  t("seviye testi baştan sona: sonuç okur seviyesi oluyor", async () => {
+    show_home();
+    click("#ptOpen");
+    await waitFor(() => visible("placement"));
+    QA("#placement button").find((b) => b.textContent === "Başla").click();
+    // Knows A1–B1, no pseudowords.
+    for (let i = 0; i < 80; i++) {
+      const word = Q("#placement .rvword").textContent;
+      const it = A("state.pt.items")[A("state.pt.i")];
+      eq(it.w, word, "shown word");
+      QA("#placement .acts button").find((b) => b.textContent === (it.l >= 1 && it.l <= 3 ? "Biliyorum" : "Bilmiyorum")).click();
+    }
+    await waitFor(() => Q("#placement .ptres"), "result");
+    const v = Math.round(A("BOUND")[3]);
+    assert(Q("#placement .ptres").textContent.startsWith(String(v)), Q("#placement .ptres").textContent);
+    eq(QA("#placement .ptbar").length, 6, "six level bars");
+    QA("#placement .acts button").find((b) => b.textContent === "Seviyem olarak kaydet").click();
+    await waitFor(() => visible("home"));
+    eq(A("state.settings.levelReset.src"), "test"); eq(A("state.settings.levelReset.value"), v);
+    eq(Q("#gauge .gnum").textContent, String(v));
+    assert(Q("#levelInfo").textContent.includes("Seviye testindeki"), Q("#levelInfo").textContent);
+    noScriptErrors();
+  });
   t("okuma ayarları: tema ve yazı boyutu", () => {
     const keepTheme = localStorage.getItem("dal-theme");
     A("openDoc(state.library.find(d => !d.importId))");
