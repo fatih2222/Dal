@@ -439,42 +439,126 @@ ul.nblist:empty,.lib ul:empty{display:none}
 .bookdel{margin-top:2rem;background:none;border:1px solid var(--line);border-radius:999px;padding:.5rem 1rem;color:var(--muted);cursor:pointer;font:inherit}
 .bookdel.sure{border-color:var(--danger);color:var(--danger)}
 @media (prefers-reduced-motion: reduce){.lvmore summary::after,.tabs button svg{transition:none}}
+
+/* ===== 2026-11 app redesign: app bar, views that slide, sheets, one set of tokens ===== */
+:root{--ab:3.25rem;--sh-1:0 1px 2px rgba(35,18,33,.05),0 6px 18px rgba(35,18,33,.06);--sh-2:0 18px 44px rgba(35,18,33,.22),0 2px 6px rgba(35,18,33,.08)}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,.nbedit{-webkit-user-select:text;user-select:text}
+main{padding-top:var(--ab)}
+.appbar{position:fixed;top:0;left:0;right:0;z-index:16;padding-top:env(safe-area-inset-top,0px);background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(16px);backdrop-filter:saturate(1.4) blur(16px);border-bottom:1px solid transparent;transition:border-color .2s,transform .25s ease}
+.appbar .in{max-width:42rem;margin:0 auto;height:var(--ab);display:flex;align-items:center;gap:.15rem;padding:0 .4rem}
+.appbar.scrolled{border-bottom-color:var(--line)}
+.appbar.away{transform:translateY(calc(-100% - 2px))}
+.abtn{flex:none;width:2.75rem;height:2.75rem;display:grid;place-items:center;border:0;background:none;border-radius:999px;color:var(--ink);cursor:pointer;font-weight:700;font-size:1rem;transition:background-color .15s}
+.abtn svg{width:22px;height:22px}
+.abtn:active{background:var(--accent-soft)}
+.abtitle{flex:1;min-width:0;font-weight:700;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .2s;padding:0 .4rem}
+.appbar.scrolled .abtitle{opacity:1}
+.abtitle.brand{font-family:Literata,Georgia,serif;font-size:1.45rem;font-weight:600;color:var(--accent);opacity:1;padding-left:.8rem}
+.abacts{flex:none;display:flex;gap:.1rem}
+#readprog{top:calc(env(safe-area-inset-top,0px) + var(--ab));transition:width .12s linear,top .25s ease}
+body.chrome-away #readprog{top:env(safe-area-inset-top,0px)}
+@keyframes inPush{from{opacity:0;transform:translateX(32px)}to{opacity:1;transform:none}}
+@keyframes inPop{from{opacity:0;transform:translateX(-32px)}to{opacity:1;transform:none}}
+@keyframes inFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.in-push{animation:inPush .28s cubic-bezier(.2,.8,.2,1)}
+.in-pop{animation:inPop .28s cubic-bezier(.2,.8,.2,1)}
+.in-fade{animation:inFade .22s ease-out}
+.primary:active,.chip:active,.tile:active,.resume:active,.branch:active,.acts button:active,.book:active,.tapchip:active,.lib .open:active,.seclist .tt:active,.nbhead:active,.filebtn:active{transform:scale(.97)}
+.primary,.chip,.tile,.resume,.branch,.acts button,.book,.tapchip,.filebtn{transition:transform .12s ease,background-color .15s,border-color .15s}
+/* Large titles of the tab screens; content titles keep the reading typeface. */
+#library h1,#trees h1,#notebook h1,#review h1,#importv h1,#placement h1{font-family:inherit;font-weight:700;font-size:1.85rem;letter-spacing:-.015em;line-height:1.15;margin:.5rem 0 1rem}
+#placement h1{margin-bottom:.6rem}
+/* Home */
+.home{padding-bottom:1rem}
+.home h1{font-family:inherit;font-weight:700;font-size:1.6rem;letter-spacing:-.015em;line-height:1.2;margin:.6rem 0 .9rem}
+.ask{flex-direction:row;align-items:center;gap:.35rem;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:.3rem .3rem .3rem .85rem;box-shadow:var(--sh-1)}
+.ask .sicon{flex:none;width:20px;height:20px;color:var(--muted)}
+.ask input{flex:1;min-width:0;width:auto;padding:.75rem .25rem;font-size:1.05rem}
+#goBtn{flex:none;width:2.9rem;height:2.9rem;padding:0;display:grid;place-items:center;border-radius:14px}
+#goBtn svg{width:21px;height:21px}
+.asksub{color:var(--muted);font-size:.85rem;margin:.55rem .3rem 0}
+.notice{border-left:0;border-radius:16px;background:color-mix(in srgb,var(--danger) 10%,var(--paper));padding:.85rem 1rem;font-size:.95rem}
+.notice .linkbtn{padding:.2rem 0;display:inline}
+.resume{display:flex;flex-direction:column;gap:.15rem;margin:1rem 0 0;padding:.95rem 1.05rem;border:0;border-radius:18px;background:var(--accent-soft);box-shadow:none}
+.resume .k{color:var(--accent);font-size:.78rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.resume .t{font-size:1.12rem}
+.resume .rp{height:4px;border-radius:2px;background:color-mix(in srgb,var(--accent) 22%,transparent);overflow:hidden;margin-top:.55rem}
+.resume .rp i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.lvcard{margin-top:1rem;border-radius:18px;padding:1rem 1.1rem .9rem;box-shadow:var(--sh-1)}
+.lvcard .levelinfo{margin:.6rem 0 0;font-size:.88rem}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin:1rem 0 0}
+.tile{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:.9rem .95rem 1rem;cursor:pointer;color:var(--ink);box-shadow:var(--sh-1)}
+.tile svg{width:24px;height:24px;color:var(--accent);margin-bottom:.35rem}
+.tile span{font-weight:700;font-size:1rem}
+.tile small{color:var(--muted);font-size:.8rem;line-height:1.3}
+#topics{margin:1.6rem 0 1rem}
+#topics .lbl{display:block;color:var(--muted);font-size:.85rem;font-weight:700;margin:0 0 .6rem}
+.chip.topic,.chip.topic:last-child{display:inline-flex;width:auto;margin:0 .45rem .55rem 0;padding:.55rem .95rem;border:1px solid var(--line);border-radius:999px;background:var(--paper);font-family:inherit;font-style:normal;font-size:.95rem;color:var(--ink)}
+/* Settings sheet */
+.setsheet{position:fixed;inset:0;z-index:30}
+.setback{position:absolute;inset:0;background:rgba(20,10,18,.4);opacity:0;transition:opacity .25s}
+.setsheet.open .setback{opacity:1}
+.setpanel{position:absolute;left:0;right:0;bottom:0;max-width:42rem;margin:0 auto;max-height:88vh;overflow:auto;overscroll-behavior:contain;background:var(--paper);border-radius:24px 24px 0 0;padding:.35rem 1.2rem calc(1.4rem + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1);box-shadow:var(--sh-2)}
+.setsheet.open .setpanel{transform:none}
+.grabbar{width:2.6rem;height:5px;border-radius:3px;background:var(--line);margin:.45rem auto .5rem}
+.sethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem}
+.sethead h2{margin:0;font-size:1.35rem;font-weight:700}
+.setsec{padding:.95rem 0 .4rem;border-top:1px solid var(--line)}
+.setsec h3{margin:0 0 .3rem;font-size:.78rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.setsec .row{margin:.55rem 0 .5rem}
+.setsec .row .lbl{width:100%;font-size:.9rem;margin:0}
+.setsec .hint{margin:.3rem 0 .4rem}
+body.modal-open{overflow:hidden}
+/* Word card: one face at a time; the turn happens edge-on, so a change of height never shows. */
+.inner{display:block!important;transform:none!important;transition:none!important}
+.face{backface-visibility:visible;-webkit-backface-visibility:visible}
+.back{transform:none;display:none}
+.flipped .front{display:none}
+.flipped .back{display:block}
+@keyframes turnOut{to{transform:perspective(1200px) rotateY(90deg)}}
+@keyframes turnIn{from{transform:perspective(1200px) rotateY(-90deg)}to{transform:perspective(1200px) rotateY(0)}}
+.flip.turn-out .face{animation:turnOut .13s ease-in forwards}
+.flip.turn-in .face{animation:turnIn .17s ease-out}
+.face{border-radius:22px;box-shadow:var(--sh-2)}
+/* Reader: the app bar carries Aa and the tree */
+.rt-aa,.rt-tree{display:none!important}
+.readtools{margin:-.6rem 0 1.2rem}
+.readtools:not(:has(button:not(.rt-aa):not(.rt-tree))){display:none}
+.toast{position:fixed;left:50%;bottom:calc(5.2rem + env(safe-area-inset-bottom,0px));transform:translate(-50%,1rem);background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:999px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:40;white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion: reduce){.in-push,.in-pop,.in-fade,.flip.turn-out .face,.flip.turn-in .face{animation:none}.setpanel,.setback,.appbar{transition:none}}
 </style>
 </head>
 <body>
 
 
+<div class="appbar" id="appbar"><div class="in">
+  <button class="abtn" id="abBack" type="button" aria-label="Geri" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <div class="abtitle" id="abTitle"></div>
+  <div class="abacts" id="abActs"></div>
+</div></div>
 <div id="readprog"></div>
 <main class="wrap">
   <section class="home" id="home">
-    <p class="wordmark">Dal</p>
-    <div id="resumeBox"></div>
     <h1>Bugün neyi merak ediyorsun?</h1>
     <form class="ask" id="askForm">
-      <input id="topic" type="text" autocomplete="off" placeholder="Frankfurt Okulu, the Marshall Plan" aria-label="Konu">
-      <button class="primary" id="goBtn" type="submit">Metni hazırla</button>
+      <svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+      <input id="topic" type="text" autocomplete="off" enterkeyhint="go" placeholder="Bir konu yaz: Frankfurt Okulu, Marshall Plan" aria-label="Konu">
+      <button class="primary" id="goBtn" type="submit" aria-label="Metni hazırla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
     </form>
-    <button class="linkbtn" id="impOpen" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Kendi metnini getir</button>
-    <div class="lvcard">
+    <p class="asksub">Türkçe ya da İngilizce yazabilirsin. Metin Wikipedia’dan alınıp seviyene göre yazılır.</p>
+    <div class="notice" id="noSample" hidden>Metin hazırlamak için önce Anthropic API anahtarını gir. <button class="linkbtn" id="noSampleOpen" type="button">Ayarları aç</button></div>
+    <div id="resumeBox"></div>
+    <div class="lvcard" id="lvcard">
       <div class="gauge" id="gauge" aria-hidden="true"></div>
       <p class="levelinfo" id="levelInfo"></p>
-      <button class="linkbtn" id="ptOpen" type="button">Kelime testiyle seviyeni ölç (4 dk)</button>
-      <details class="lvmore">
-        <summary>Seviye ve uzunluğu değiştir</summary>
-        <div class="row" id="readerRow"><span class="lbl">Okur seviyen yanlış görünüyorsa düzelt</span><label class="scorein">Puan <input id="readerIn" type="number" min="5" max="95" step="1" inputmode="numeric" aria-label="Okur seviyen"></label><button class="chip" id="readerSet" type="button">Güncelle</button><span class="hint" id="readerMsg" style="flex-basis:100%;margin:0"></span></div>
-        <div class="row" id="levels"><span class="lbl">Seviye</span><label class="scorein" id="scoreWrap">Puan <input id="scoreIn" type="number" min="5" max="95" step="1" inputmode="numeric" aria-label="Zorluk puanı"></label></div>
-        <div class="row" id="lens"><span class="lbl">Uzunluk</span></div>
-      </details>
+    </div>
+    <div class="tiles">
+      <button class="tile" id="impOpen" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg><span>Kendi metnin</span><small>Yapıştır, PDF ya da fotoğraf</small></button>
+      <button class="tile" id="ptOpen" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg><span>Seviye testi</span><small>Kelime testi, 4 dakika</small></button>
     </div>
     <div id="topics"><span class="lbl">Fikir lazımsa</span></div>
-    <div class="notice" id="noSample" hidden>Metin hazırlamak için aşağıdaki “API anahtarı” bölümünden Anthropic API anahtarını gir.</div>
-    <details class="lvmore" id="keyBox">
-      <summary>API anahtarı</summary>
-      <p class="hint" id="keyState"></p>
-      <div class="row"><input id="keyIn" class="keyin" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Anthropic API anahtarı"></div>
-      <div class="row"><button class="chip" id="keySave" type="button">Kaydet</button><button class="chip" id="keyDel" type="button">Sil</button></div>
-      <p class="hint">Anahtar yalnızca bu cihazdaki tarayıcıda saklanır; başka hiçbir yere gönderilmez, sadece Anthropic’e yapılan isteklerde kullanılır. Anthropic Console’da bu anahtar için harcama limiti koyman iyi olur.</p>
-    </details>
   </section>
 
   <section id="library" hidden>
@@ -542,6 +626,32 @@ ul.nblist:empty,.lib ul:empty{display:none}
       <div class="face front" id="front"></div>
       <div class="face back" id="back"></div>
     </div>
+  </div>
+</div>
+
+<div class="setsheet" id="settings" hidden>
+  <div class="setback" id="setBack"></div>
+  <div class="setpanel" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="grabbar" aria-hidden="true"></div>
+    <div class="sethead"><h2 id="setTitle">Ayarlar</h2><button class="x" id="setClose" type="button" aria-label="Ayarları kapat">×</button></div>
+    <section class="setsec">
+      <h3>Seviye</h3>
+      <div class="row" id="readerRow"><span class="lbl">Okur seviyen yanlış görünüyorsa düzelt</span><label class="scorein">Puan <input id="readerIn" type="number" min="5" max="95" step="1" inputmode="numeric" aria-label="Okur seviyen"></label><button class="chip" id="readerSet" type="button">Güncelle</button><span class="hint" id="readerMsg" style="flex-basis:100%;margin:0"></span></div>
+      <div class="row" id="levels"><span class="lbl">Yeni metinlerin seviyesi</span><label class="scorein" id="scoreWrap">Puan <input id="scoreIn" type="number" min="5" max="95" step="1" inputmode="numeric" aria-label="Zorluk puanı"></label></div>
+      <div class="row" id="lens"><span class="lbl">Uzunluk</span></div>
+      <div class="row"><button class="chip" id="setPt" type="button">Seviye testini yap</button></div>
+    </section>
+    <section class="setsec">
+      <h3>Okuma görünümü</h3>
+      <div id="setRead"></div>
+    </section>
+    <section class="setsec" id="keyBox">
+      <h3>API anahtarı</h3>
+      <p class="hint" id="keyState"></p>
+      <div class="row"><input id="keyIn" class="keyin" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Anthropic API anahtarı"></div>
+      <div class="row"><button class="chip" id="keySave" type="button">Kaydet</button><button class="chip" id="keyDel" type="button">Sil</button></div>
+      <p class="hint">Anahtar yalnızca bu cihazdaki tarayıcıda saklanır; başka hiçbir yere gönderilmez, sadece Anthropic’e yapılan isteklerde kullanılır. Anthropic Console’da bu anahtar için harcama limiti koyman iyi olur.</p>
+    </section>
   </div>
 </div>
 
@@ -1598,28 +1708,170 @@ async function deleteDocs(ids) {
 /* =========================================================
    Views
    ========================================================= */
+/* =========================================================
+   Navigation. The app keeps its own stack of screens; the browser history only ever holds the page
+   itself plus at most one "guard" entry above it. Android's back button or gesture uses up the guard,
+   and the app then closes an open card or panel, or returns to the previous screen, and puts a new
+   guard in place. Nothing ever jumps several history steps, so back can never leave the app by
+   accident. On Oku with nothing open, the first back shows a hint and the second one leaves the app.
+   ========================================================= */
+const ROOTS = ["home", "library", "trees", "notebook", "review"];
+const nav = { stack: [], restoring: false, armed: false };
+const haptic = (ms = 8) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} };
+const curView = () => document.body.dataset.view || "home";
+function restoreFor(view) {
+  if (view === "reader") { const d = state.doc; return () => (d ? openDoc(d) : show("home")); }
+  if (view === "tree") { const r = state.treeRoot; return () => showTree(r); }
+  if (view === "importdoc") { const id = state.curImport; return () => showImport(id); }
+  if (view === "notebook") return () => { show("notebook"); renderNotebook(); };
+  if (view === "review") return () => startReview();
+  if (view === "placement") return () => { state.pt = null; show("placement"); renderPlacement(); };
+  if (view === "loading") return () => show("home");
+  return () => show(view);
+}
+// Updates the app's own stack and says how the screen arrived: "push", "pop", "tab" or "same".
+function navRecord(view) {
+  if (nav.restoring) return "pop";
+  const entry = { view, restore: restoreFor(view) };
+  const top = nav.stack[nav.stack.length - 1];
+  if (view === "home") { nav.stack = [entry]; return top && top.view === "home" ? "same" : "tab"; }
+  if (ROOTS.includes(view)) { nav.stack = [{ view: "home", restore: () => show("home") }, entry]; return top && top.view === view ? "same" : "tab"; }
+  if (top && (top.view === view || top.view === "loading")) { nav.stack[nav.stack.length - 1] = entry; return top.view === view ? "same" : "push"; }
+  nav.stack.push(entry);
+  return "push";
+}
+function overlayOpen() { return $("#sheet").classList.contains("open") || $("#settings").classList.contains("open") || !!state.pick; }
+function closeOverlays() { if ($("#settings").classList.contains("open")) closeSettings(); if (state.pick) endPick(); if ($("#sheet").classList.contains("open")) closeCard(); }
+// Puts a guard entry on the history when back has something to do inside the app.
+function syncGuard() {
+  if (nav.armed) return;
+  if (nav.stack.length > 1 || curView() !== "home" || overlayOpen()) {
+    try { history.pushState({ dal: "guard" }, ""); nav.armed = true; } catch (e) {}
+  }
+}
+function handleBack() {
+  if (overlayOpen()) { closeOverlays(); return true; }
+  if (!$("#loading").hidden && state.ctl) state.ctl.abort();
+  if (nav.stack.length > 1) {
+    nav.stack.pop();
+    const e = nav.stack[nav.stack.length - 1];
+    nav.restoring = true;
+    try { e.restore(); } finally { nav.restoring = false; }
+    return true;
+  }
+  if (curView() !== "home") { show("home"); return true; }
+  return false;
+}
+window.addEventListener("popstate", () => {
+  nav.armed = false;
+  if (handleBack()) syncGuard();
+  else toast("Çıkmak için tekrar geri bas");
+});
+// The app bar's back arrow: same as the system back, through the guard when there is one.
+function goBack() {
+  if (nav.armed) history.back();
+  else if (handleBack()) syncGuard();
+}
+function toast(msg) {
+  let t = $("#toast");
+  if (!t) { t = el("div", "toast"); t.id = "toast"; t.setAttribute("role", "status"); document.body.append(t); }
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => t.classList.remove("on"), 2200);
+}
+
+const VIEW_TITLES = { library: "Kitaplık", trees: "Ağaçlar", notebook: "Defter", review: "Tekrar", tree: "Okuma ağacı", importv: "Kendi metnin", placement: "Seviye testi", loading: "Hazırlanıyor" };
+const AB_ICON = {
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  tree: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M6 12h10"/></svg>',
+};
+function abButton(label, html, fn) {
+  const b = el("button", "abtn");
+  b.type = "button";
+  b.setAttribute("aria-label", label);
+  b.innerHTML = html;
+  b.onclick = (e) => { e.stopPropagation(); fn(); };
+  return b;
+}
+function setAppbar(view) {
+  const title = $("#abTitle"), acts = $("#abActs");
+  acts.innerHTML = "";
+  title.className = "abtitle";
+  $("#abBack").hidden = ROOTS.includes(view);
+  if (view === "home") {
+    title.classList.add("brand");
+    title.textContent = "Dal";
+    acts.append(abButton("Ayarlar", AB_ICON.settings, openSettings));
+  } else if (view === "reader" && state.doc) {
+    const d = state.doc;
+    title.textContent = d.title;
+    acts.append(abButton("Okuma ayarları", "Aa", () => { const b = $("#article .rt-aa"); if (b) b.click(); }));
+    if (d.parentId || (d.branches || []).length) acts.append(abButton("Ağaçta göster", AB_ICON.tree, () => showTree(rootOf(d))));
+  } else if (view === "importdoc") {
+    const imp = state.imports.find((x) => x.id === state.curImport);
+    title.textContent = imp ? imp.title : "Belge";
+  } else if (view === "tree") {
+    const r = byId(state.treeRoot);
+    title.textContent = r ? r.title : VIEW_TITLES.tree;
+  } else title.textContent = VIEW_TITLES[view] || "";
+  syncAppbarScroll();
+}
+function syncAppbarScroll() { $("#appbar").classList.toggle("scrolled", window.scrollY > 24); }
+$("#abBack").onclick = () => goBack();
+
 function show(view) {
+  const how = navRecord(view);
   ["home", "loading", "reader", "tree", "trees", "library", "notebook", "review", "importv", "importdoc", "placement"].forEach((v) => ($("#" + v).hidden = v !== view));
   document.body.dataset.view = view;
   const tab = view === "reader" && state.doc && state.doc.importId ? "library"
-    : { home: "home", loading: "home", reader: "home", tree: "trees", trees: "trees", library: "library", notebook: "notebook", review: "review", importv: "home", importdoc: "library" }[view];
+    : { home: "home", loading: "home", reader: "home", tree: "trees", trees: "trees", library: "library", notebook: "notebook", review: "review", importv: "home", importdoc: "library", placement: "home" }[view];
   document.querySelectorAll("#tabs button").forEach((b) => { if (b.dataset.v === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   $("#tabs").classList.remove("away");
+  $("#appbar").classList.remove("away");
+  document.body.classList.remove("chrome-away");
   if (state.pick) endPick();
   closeCard();
+  if ($("#settings").classList.contains("open")) closeSettings();
   if (view === "home" || view === "trees" || view === "library") { renderLibrary(); renderLevels(); }
-  window.scrollTo(0, 0);
+  if (how !== "same") window.scrollTo(0, 0);
+  setAppbar(view);
+  const sec = $("#" + view);
+  sec.classList.remove("in-push", "in-pop", "in-fade");
+  if (how !== "same") { void sec.offsetWidth; sec.classList.add(how === "push" ? "in-push" : how === "pop" ? "in-pop" : "in-fade"); }
+  if (!nav.restoring) syncGuard();
 }
-document.querySelectorAll("#tabs button").forEach((b) => {
-  b.onclick = () => {
-    const v = b.dataset.v;
-    if (v === "home") show("home");
-    else if (v === "trees") show("trees");
-    else if (v === "library") show("library");
-    else if (v === "notebook") { show("notebook"); renderNotebook(); }
-    else startReview();
-  };
-});
+function openTab(v) {
+  if (v === "home") show("home");
+  else if (v === "trees") show("trees");
+  else if (v === "library") show("library");
+  else if (v === "notebook") { show("notebook"); renderNotebook(); }
+  else startReview();
+}
+function goTab(v) { closeOverlays(); openTab(v); }
+document.querySelectorAll("#tabs button").forEach((b) => { b.onclick = () => goTab(b.dataset.v); });
+
+/* Settings sheet */
+function openSettings() {
+  const st = $("#settings");
+  st.hidden = false;
+  renderReadPanel($("#setRead"));
+  renderLevels();
+  void st.offsetWidth;
+  st.classList.add("open");
+  document.body.classList.add("modal-open");
+  syncGuard();
+}
+function closeSettings() {
+  const st = $("#settings");
+  st.classList.remove("open");
+  document.body.classList.remove("modal-open");
+  setTimeout(() => { if (!st.classList.contains("open")) st.hidden = true; }, 300);
+}
+$("#setClose").onclick = () => closeSettings();
+$("#setBack").onclick = () => closeSettings();
+$("#noSampleOpen").onclick = () => openSettings();
+$("#setPt").onclick = () => { closeSettings(); $("#ptOpen").click(); };
 
 function showTree(rootId) {
   const root = byId(rootId);
@@ -2144,7 +2396,7 @@ function openDoc(d) {
   if (crumbs) art.append(el("p", "crumbs", crumbs));
   art.append(el("h1", null, d.title), el("p", "lvl", lvlLine(d)));
   const tools = el("div", "readtools");
-  const aa = el("button", "ghost small", "Aa");
+  const aa = el("button", "ghost small rt-aa", "Aa");
   aa.type = "button";
   aa.setAttribute("aria-label", "Okuma ayarları");
   tools.append(aa);
@@ -2162,7 +2414,7 @@ function openDoc(d) {
     });
   }
   if (d.parentId || d.branches.length) {
-    const tb = el("button", "ghost small", "Ağaçta göster");
+    const tb = el("button", "ghost small rt-tree", "Ağaçta göster");
     tb.type = "button";
     tb.onclick = () => showTree(rootOf(d));
     tools.append(tb);
@@ -2578,6 +2830,7 @@ function openCard() {
   setPeek(!(state.active && state.active.sentence));
   $("#sheet").classList.add("open");
   document.body.classList.add("sheet-open");
+  syncGuard();
   requestAnimationFrame(() => {
     const t = state.active && state.tokens[state.active.i];
     if (!t) return;
@@ -2725,10 +2978,24 @@ document.querySelectorAll(".face").forEach((f) => f.addEventListener("click", (e
   if (sheetSwiped) return;
   if (state.active && (state.active.k != null || state.active.sentence)) flip();
 }));
+// The card turns edge-on, swaps faces while it cannot be seen, then turns back to face the reader.
 function flip() {
   const fl = $("#flip");
-  fl.classList.toggle("flipped");
-  if (fl.classList.contains("flipped") && state.active && state.active.k != null) translateSentence(state.active.s);
+  if (fl.dataset.turning) return;
+  const swap = () => {
+    fl.classList.toggle("flipped");
+    if (fl.classList.contains("flipped") && state.active && state.active.k != null) translateSentence(state.active.s);
+  };
+  haptic(6);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return swap();
+  fl.dataset.turning = "1";
+  fl.classList.add("turn-out");
+  setTimeout(() => {
+    swap();
+    fl.classList.remove("turn-out");
+    fl.classList.add("turn-in");
+    setTimeout(() => { fl.classList.remove("turn-in"); delete fl.dataset.turning; }, 180);
+  }, 130);
 }
 
 function fillTr(box, str) {
@@ -2914,7 +3181,13 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (stat
     const y = window.scrollY;
     const reading = !$("#reader").hidden;
     const hide = reading && y > 80 && y > lastY;
-    if (Math.abs(y - lastY) > 6 || y < 80) { $("#tabs").classList.toggle("away", hide); lastY = y; }
+    if (Math.abs(y - lastY) > 6 || y < 80) {
+      $("#tabs").classList.toggle("away", hide);
+      $("#appbar").classList.toggle("away", hide);
+      document.body.classList.toggle("chrome-away", hide);
+      lastY = y;
+    }
+    syncAppbarScroll();
   }, { passive: true });
 })();
 
@@ -2940,7 +3213,10 @@ function renderResume() {
   if (!d) return;
   const b = el("button", "resume");
   b.type = "button";
-  b.append(el("div", "k", "Kaldığın yerden devam et"), el("div", "t", d.title));
+  const bar = el("div", "rp"), fill = el("i");
+  fill.style.width = Math.max(4, Math.min(100, d.readPct || 0)) + "%";
+  bar.append(fill);
+  b.append(el("div", "k", "Kaldığın yerden devam et"), el("div", "t", d.title), bar);
   b.onclick = () => openDoc(d);
   box.append(b);
 }
@@ -3728,6 +4004,7 @@ function auditPart(d) {
 function showImport(id) {
   const imp = state.imports.find((x) => x.id === id);
   if (!imp) return show("library");
+  state.curImport = id;
   const box = $("#importdoc");
   box.innerHTML = "";
   const secs = imp.sections.map(byId).filter(Boolean);
@@ -3961,11 +4238,10 @@ function setupKeyBox() {
     try { localStorage.setItem(KEY_LS, v); } catch (e) { $("#keyState").textContent = "Anahtar bu tarayıcıda kaydedilemedi."; return; }
     $("#keyIn").value = "";
     sync();
-    $("#keyBox").open = false;
+    haptic();
   };
   $("#keyDel").onclick = () => { try { localStorage.removeItem(KEY_LS); } catch (e) {} sync(); };
   sync();
-  if (!getKey()) $("#keyBox").open = true;
 }
 
 /* =========================================================
@@ -3974,6 +4250,9 @@ function setupKeyBox() {
 renderLevels();
 renderLibrary();
 applyRead();
+nav.stack = [{ view: "home", restore: () => show("home") }];
+document.body.dataset.view = "home";
+setAppbar("home");
 (async () => {
   setupKeyBox();
   try {

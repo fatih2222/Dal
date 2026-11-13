@@ -22,9 +22,14 @@ Sekme ekranda açık kalmalı: arka plandaki sekmede tarayıcı çizimi durdurur
 <div id="sum">Çalışıyor…</div>
 <ul id="out"></ul>
 <div id="stage"></div>
-<script src="harness.js"></script>
-<script src="unit.test.js"></script>
-<script src="flows.test.js"></script>
-<script>runAll();</script>
+<script>
+// Always the newest test files: a cached older copy would test yesterday's expectations.
+(async () => {
+  for (const f of ["harness.js", "unit.test.js", "flows.test.js"]) {
+    await new Promise((res, rej) => { const s = document.createElement("script"); s.src = f + "?v=" + Date.now(); s.onload = res; s.onerror = rej; document.body.append(s); });
+  }
+  runAll();
+})();
+</script>
 </body>
 </html>

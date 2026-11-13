@@ -11,15 +11,25 @@ async function generateFromHome(topic) {
 }
 
 suite("Akış: metin üretme ve okuma", (t) => {
-  t("anahtarsız: düğme kapalı, uyarı açık", async () => {
+  t("anahtarsız: düğme kapalı, uyarı ayarlara götürüyor", async () => {
     await loadApp();
-    eq(Q("#goBtn").disabled, true); assert(!Q("#noSample").hidden, "notice shown"); assert(Q("#keyBox").open, "key box open");
+    eq(Q("#goBtn").disabled, true); assert(!Q("#noSample").hidden, "notice shown");
+    click("#noSampleOpen");
+    await waitFor(() => Q("#settings").classList.contains("open"), "settings open");
+    assert(!Q("#settings").hidden, "settings visible");
   });
-  t("anahtar kaydedilince düğme açılıyor", () => {
+  t("anahtar kaydedilince düğme açılıyor, panel geri tuşuyla kapanıyor", async () => {
     Q("#keyIn").value = "sk-ant-test-fake";
     click("#keySave");
     eq(Q("#goBtn").disabled, false); assert(Q("#noSample").hidden, "notice hidden");
     eq(W.localStorage.getItem("dal-api-key-test"), "sk-ant-test-fake");
+    A("goBack()");
+    await waitFor(() => !Q("#settings").classList.contains("open"), "settings closed by back");
+    eq(A("curView()"), "home", "still on home");
+  });
+  t("üst çubuk: ana ekranda marka ve ayarlar düğmesi", () => {
+    eq(Q("#abTitle").textContent, "Dal"); assert(Q("#abBack").hidden, "no back on home");
+    assert(QA("#abActs .abtn").some((b) => b.getAttribute("aria-label") === "Ayarlar"), "settings button");
   });
   t("Türkçe konudan metin üretiliyor ve okuyucu açılıyor", async () => {
     NET.calls = [];
@@ -79,6 +89,26 @@ suite("Akış: metin üretme ve okuma", (t) => {
     eq(A("state.settings.history.length"), before + 1, "history grew");
     assert(Q("#endBox .result").textContent.includes("Okur seviyen şimdi"), "level text");
   });
+  t("üst çubuk: okurken geri düğmesi, başlık, Aa ve ağaç", () => {
+    assert(!Q("#abBack").hidden, "back shown");
+    eq(Q("#abTitle").textContent, A("state.doc.title"));
+    const labels = QA("#abActs .abtn").map((b) => b.getAttribute("aria-label"));
+    assert(labels.includes("Okuma ayarları") && labels.includes("Ağaçta göster"), labels.join(","));
+    QA("#abActs .abtn").find((b) => b.getAttribute("aria-label") === "Okuma ayarları").click();
+    assert(!Q("#article .readpanel").hidden, "reading panel opened from the app bar");
+    QA("#abActs .abtn").find((b) => b.getAttribute("aria-label") === "Okuma ayarları").click();
+  });
+  t("kart iki yarıda dönüyor, yüzler birbirini gizliyor", async () => {
+    A("openSentence(0)");
+    await waitFor(() => Q("#sheet").classList.contains("open"));
+    assert(!Q("#flip").classList.contains("flipped"), "front first");
+    A("flip()");
+    assert(Q("#flip").classList.contains("turn-out"), "turning out");
+    await waitFor(() => Q("#flip").classList.contains("flipped"), "faces swapped");
+    await waitFor(() => !Q("#flip").dataset.turning, "turn finished", 1000);
+    eq(W.getComputedStyle(Q("#front")).display, "none", "front hidden"); assert(W.getComputedStyle(Q("#back")).display !== "none", "back shown");
+    A("closeCard()");
+  });
   t("Bitirmeyi geri al", async () => {
     const b = QA("#endBox .result button").find((x) => x.textContent.includes("geri al"));
     b.click();
@@ -108,6 +138,24 @@ suite("Akış: dallar ve ağaç", (t) => {
     eq(paths, rows - 1, "one line per non-root row");
     assert(QA("#tree .drow.sugg").length >= 1, "suggestions shown");
     eq(W.document.documentElement.scrollWidth, W.document.documentElement.clientWidth, "no sideways scroll");
+  });
+  t("geri: ağaçtan okumaya, okumadan bir öncekine; kart önce kapanıyor", async () => {
+    eq(A("curView()"), "tree");
+    QA("#tree .drow:not(.sugg) .tt")[1].click();
+    await waitFor(() => A("curView()") === "reader", "reader from tree");
+    A("openSentence(0)");
+    await waitFor(() => Q("#sheet").classList.contains("open"));
+    A("goBack()");
+    await waitFor(() => !Q("#sheet").classList.contains("open"), "card closed first");
+    eq(A("curView()"), "reader", "still reading");
+    A("goBack()");
+    await waitFor(() => A("curView()") === "tree", "back to the tree");
+  });
+  t("sekme değiştirme: geri ana ekrana döner", async () => {
+    click('#tabs button[data-v="notebook"]');
+    await waitFor(() => A("curView()") === "notebook");
+    A("goBack()");
+    await waitFor(() => A("curView()") === "home", "back from a tab goes to Oku");
   });
   t("Ağaçlar sekmesi listesi", async () => {
     click('#tabs button[data-v="trees"]');
