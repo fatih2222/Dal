@@ -550,6 +550,11 @@ const KIND_TR = { phrasal: "phrasal verb", idiom: "deyim", collocation: "kalıp"
 const BTYPE_TR = { person: "Kişi", concept: "Kavram", event: "Olay", institution: "Kurum", place: "Yer", work: "Eser" };
 const WORD_RE = /[A-Za-zÀ-ÖØ-öø-ÿ0-9]+(?:['’][A-Za-z]+|-[A-Za-zÀ-ÖØ-öø-ÿ0-9]+)*/g;
 
+// PDFs often store fi, fl, ff… as one ligature character, which is not a letter for WORD_RE:
+// "signiﬁcant" would split into "signi" + "cant". Every text that enters the app goes through fixLig.
+const LIGS = { "ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl", "ﬃ": "ffi", "ﬄ": "ffl", "ﬅ": "st", "ﬆ": "st" };
+const LIG_RE = /[ﬀ-ﬆ]/g;
+const fixLig = (s) => String(s).replace(LIG_RE, (c) => LIGS[c]);
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const norm = (s) => String(s).toLowerCase().replace(/’/g, "'").trim();
@@ -1109,10 +1114,43 @@ function flushSaves() {
 }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSaves(); });
 window.addEventListener("pagehide", flushSaves);
+// Repairs ligatures in a text saved before fixLig existed. Taps store word positions, and joining
+// "signi cant" into one word shifts the positions after it, so each tap is moved to its word's new position.
+function ligView(v) {
+  const paras = v.paragraphs || [];
+  if (!paras.some((p) => p.match(LIG_RE))) return false;
+  const oldTok = [], newTok = [], maps = [];
+  const fixed = paras.map((p, pi) => {
+    let s = "";
+    const map = [];
+    for (let i = 0; i < p.length; i++) { map.push(s.length); s += LIGS[p[i]] || p[i]; }
+    maps.push(map);
+    for (const m of p.matchAll(WORD_RE)) oldTok.push([pi, m.index]);
+    for (const m of s.matchAll(WORD_RE)) newTok.push([pi, m.index, m.index + m[0].length]);
+    return s;
+  });
+  const moved = oldTok.map(([pi, at]) => {
+    const pos = maps[pi][at];
+    const j = newTok.findIndex(([q, a, b]) => q === pi && pos >= a && pos < b);
+    return j < 0 ? null : j;
+  });
+  (v.taps || []).forEach((t) => { t.idx = [...new Set((t.idx || []).map((i) => moved[i]).filter((x) => x != null))]; });
+  v.paragraphs = fixed;
+  return true;
+}
+function ligDoc(d) {
+  let changed = ligView(d);
+  Object.values(d.views || {}).forEach((v) => { if (v && ligView(v)) changed = true; });
+  // Titles, summaries, terms and so on: no positions depend on them.
+  const json = JSON.stringify(d);
+  if (json.match(LIG_RE)) { Object.assign(d, JSON.parse(fixLig(json))); changed = true; }
+  return changed;
+}
 async function loadAll() {
   try {
     const snap = await col().get();
     const all = snap.docs.map((d) => JSON.parse(JSON.stringify(d.data() || null))).filter(Boolean);
+    all.forEach((d) => { if ((d.kind === "text" || d.kind === "import") && ligDoc(d)) saveDoc(d); });
     const s = all.find((d) => d.kind === "settings");
     if (s) {
       if (s.level && !s.start) { s.start = s.level; s.manual = s.level; }
@@ -3101,7 +3139,7 @@ async function pdfToPages(file, onProg) {
       if (it.hasEOL) { lines.push(cur.t); cur = null; }
     });
     if (cur) lines.push(cur.t);
-    pages.push(lines.map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean));
+    pages.push(lines.map((l) => fixLig(l).replace(/\s+/g, " ").trim()).filter(Boolean));
     if (onProg) onProg(i, n);
   }
   return { pages, pdf, total: pdf.numPages };
@@ -3196,7 +3234,7 @@ function cleanPdf(pages, stripped) {
   return blocks;
 }
 function textToBlocks(raw) {
-  const t = String(raw).replace(/\r/g, "").replace(/([a-z])-\n([a-z])/g, "$1$2");
+  const t = fixLig(raw).replace(/\r/g, "").replace(/([a-z])-\n([a-z])/g, "$1$2");
   let parts = t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   if (parts.length <= 1) parts = t.split(/\n/).map((p) => p.trim()).filter(Boolean);
   const blocks = [];

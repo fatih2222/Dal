@@ -289,6 +289,16 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     eq(Object.keys(A("state.nb.words")).length, words, "notebook reloaded");
     noScriptErrors();
   });
+  t("eski kayıtlı ligatürlü belge açılışta onarılıp kaydediliyor", async () => {
+    await A("col()").doc("ligold").set({ kind: "text", id: "ligold", title: "Old ﬁle", paragraphs: ["A signiﬁcant idea. People agree."], taps: [{ key: "u:agree", lemma: "agree", idx: [5] }], branches: [], createdAt: 1 });
+    await loadApp({ fresh: false });
+    const d = A('byId("ligold")');
+    eq(d.paragraphs[0], "A significant idea. People agree."); eq(d.title, "Old file"); eq(d.taps[0].idx[0], 4);
+    A("flushSaves()"); await wait(1200);
+    const saved = (await A("col()").get()).docs.map((x) => x.data()).find((x) => x.id === "ligold");
+    eq(saved.paragraphs[0], "A significant idea. People agree.", "repaired copy saved");
+    noScriptErrors();
+  });
   t("temizlik: test veritabanı ve anahtar siliniyor", async () => {
     frame.remove(); frame = null;
     await deleteTestDb();

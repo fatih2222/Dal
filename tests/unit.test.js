@@ -35,6 +35,39 @@ suite("Puan hesabı", (t) => {
   });
 });
 
+suite("PDF ligatürleri", (t) => {
+  const LIGTEXT = "The signiﬁcant ﬁrst ﬂow of eﬀort was oﬃcial. Many people agree with it today.";
+  t("ligatür harfleri normal harfe çevriliyor", () => eq(A("fixLig")("signiﬁcant ﬂow eﬀort oﬃce"), "significant flow effort office"));
+  t("yapıştırılan metinde kelimeler bölünmüyor", () => {
+    const blocks = A("textToBlocks")(LIGTEXT + "\n\nSecond paragraph with enough words to be a real paragraph of text here.");
+    assert(blocks[0].paras[0].includes("significant first flow of effort was official"), blocks[0].paras[0]);
+  });
+  t("puan temiz metinle aynı", () => {
+    const fixed = A("textToBlocks")(LIGTEXT)[0].paras;
+    const clean = ["The significant first flow of effort was official. Many people agree with it today."];
+    eq(Math.round(A("measure")(fixed, 47, []).score), Math.round(A("measure")(clean, 47, []).score));
+  });
+  t("kayıtlı belge onarılıyor, dokunuşlar doğru kelimede kalıyor", () => {
+    // Old tokens: The signi cant rst ow of e ort was o cial Many people agree with it today
+    const WORD_RE = A("WORD_RE");
+    const d = { kind: "text", paragraphs: [LIGTEXT], title: "Oﬃce", taps: [
+      { key: "u:agree", idx: [13] }, { key: "u:significant", idx: [1, 2] }, { key: "u:official", idx: [9] },
+    ] };
+    eq((d.paragraphs[0].match(WORD_RE) || [])[13], "agree", "old position of agree");
+    assert(A("ligDoc")(d), "changed");
+    const words = d.paragraphs[0].match(WORD_RE);
+    eq(words[d.taps[0].idx[0]], "agree", "agree still tapped");
+    eq(JSON.stringify(d.taps[1].idx), "[1]", "two halves became one word"); eq(words[1], "significant");
+    eq(words[d.taps[2].idx[0]], "official");
+    eq(d.title, "Office", "title fixed");
+  });
+  t("uyarlanmış ve orijinal görünümler de onarılıyor", () => {
+    const d = { kind: "text", paragraphs: ["ok text"], views: { orig: { paragraphs: ["ﬁrst word here"], taps: [{ idx: [2] }] } } };
+    assert(A("ligDoc")(d)); eq(d.views.orig.paragraphs[0], "first word here"); eq(d.views.orig.taps[0].idx[0], 2);
+  });
+  t("ligatürsüz belgeye dokunulmuyor", () => eq(A("ligDoc")({ kind: "text", paragraphs: ["Plain text."], taps: [{ idx: [0] }] }), false));
+});
+
 suite("Cümle bölme", (t) => {
   t("noktalama ve tırnaklarla doğru bölüyor", () => {
     const s = A("splitSentences")('He left. She said "Yes." Then it rained! Did it stop? 1990 was hot.');
