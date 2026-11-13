@@ -97,14 +97,14 @@ function cleanText(raw) {
 function measureTokens(paragraphs) {
   const WORD_RE = A("WORD_RE"), norm = A("norm"), wordInfo = A("wordInfo"), split = A("splitSentences"), scoreAt = A("scoreAt");
   const counts = [0, 0, 0, 0, 0, 0, 0, 0]; let n = 0;
+  const names = A("personNames")(paragraphs), nameKey = A("nameKey");
   paragraphs.forEach((p) => split(p).forEach((s) => {
-    let first = true;
     for (const m of s.matchAll(WORD_RE)) {
-      const raw = m[0], isFirst = first; first = false;
+      const raw = m[0];
       if (/^\d/.test(raw)) continue;
       let info = wordInfo(norm(raw));
       if (raw === "I" || /^I['’]/.test(raw)) info = { l: 1 };
-      else if (raw[0] !== raw[0].toLowerCase() && (!isFirst || !info || info.freq)) continue;
+      else if (raw[0] !== raw[0].toLowerCase() && (!A("capListed")(norm(raw), info) || names.has(nameKey(raw)) || (raw.length > 1 && raw === raw.toUpperCase()))) continue;
       counts[info ? info.l : 7]++; n++;
     }
   }));
@@ -122,12 +122,11 @@ function analyse(paragraphs) {
   // Off-list (level 7) lowercase words, for the error analysis.
   const off = [];
   paragraphs.forEach((p) => split(p).forEach((s) => {
-    let first = true;
     for (const mm of s.matchAll(WORD_RE)) {
-      const raw = mm[0], isFirst = first; first = false;
+      const raw = mm[0];
       if (/^\d/.test(raw) || raw === "I") continue;
       const low = norm(raw), info = wordInfo(low);
-      if (raw[0] !== raw[0].toLowerCase() && (!isFirst || !info)) continue;
+      if (raw[0] !== raw[0].toLowerCase()) continue;
       if (!info) off.push(low);
     }
   }));

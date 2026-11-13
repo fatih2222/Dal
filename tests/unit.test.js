@@ -1,6 +1,13 @@
 // Unit tests: pure logic and the app's own layers, against a fresh app in test mode.
 "use strict";
 
+// Words of a text that the score counts (the app's own token order).
+function countedWords(paras) {
+  const m = A("measure")(paras, 47, []);
+  const toks = paras.flatMap((p) => p.match(A("WORD_RE")) || []);
+  return toks.filter((_, i) => m.counted[i]);
+}
+
 suite("Hazırlık", (t) => {
   t("uygulama test modunda açılıyor", async () => {
     await loadApp();
@@ -70,9 +77,11 @@ suite("Kalıp ifadeler ve cümle uzunluğu (Aşama 3)", (t) => {
     const m = A("measure")(["We got out of the car and moved on to the house."], 47, []);
     eq(m.n, 12, "every word counted on its own");
   });
-  t("isim içindeki kalıp birim sayılmıyor", () => {
-    const a = A("measure")(["They met at Global Warming House today."], 47, []);
-    assert(!a.above.some(([k]) => k === "global warming"), "capitalised words are names");
+  t("kurum adındaki kalıp da birim, kişi adındaki kelimeler sayılmıyor", () => {
+    const a = A("measure")(["They met at the Polar Bear Centre today."], 47, []);
+    assert(a.above.some(([k]) => k === "polar bear"), JSON.stringify(a.above));
+    const b = A("measure")(["Mark Polar spoke today."], 47, []);
+    assert(!b.above.some(([k]) => k === "polar"), "surname not counted");
   });
   t("cümle uzunluğu satırı", () => {
     assert(A("sentenceLine")(["One two three. Four five six seven."]).includes("kısa"), "short");
@@ -107,6 +116,47 @@ suite("Seviye testi (Aşama 4)", (t) => {
   });
   t("seviyeler azalan sıraya getiriliyor", () => {
     eq(JSON.stringify(A("nonIncreasing")([1, 0.6, 0.8, 0.2, 0.3, 0])), JSON.stringify([1, 0.7, 0.7, 0.25, 0.25, 0]));
+  });
+});
+
+suite("Kişi adları ve kurum adları", (t) => {
+  t("kurum ve belge adındaki kelimeler sayılıyor", () => {
+    const c = countedWords(["Atatürk issued the Amasya Circular. The Grand National Assembly met in Ankara."]);
+    assert(c.includes("Circular") && c.includes("Assembly") && c.includes("National"), c.join(" "));
+    assert(!c.includes("Atatürk") && !c.includes("Amasya") && !c.includes("Ankara"), "names left out");
+  });
+  t("ön addan sonra gelen soyadı sayılmıyor, metnin geri kalanında da", () => {
+    const c = countedWords(["George Bush visited the city. Later, Bush spoke to the press. Bush was tired."]);
+    assert(!c.includes("George") && !c.includes("Bush"), c.join(" "));
+    assert(c.includes("visited") && c.includes("spoke"), "other words counted");
+  });
+  t("unvandan sonra gelen soyadı ve baş harfler", () => {
+    const c = countedWords(["President Baker met George W. Bush and Mrs Young."]);
+    assert(!c.includes("Baker") && !c.includes("Bush") && !c.includes("Young"), c.join(" "));
+    assert(c.includes("President") && c.includes("met"), "title itself is a word");
+  });
+  t("kurum sözcüğü unvandan sonra gelse de sayılıyor", () => {
+    const c = countedWords(["The General Assembly voted. King Street was closed."]);
+    assert(c.includes("Assembly") && c.includes("Street"), c.join(" "));
+  });
+  t("kelime olan ön ad: Bill Gates isim, cümle başındaki Will kelime", () => {
+    const a = countedWords(["Bill Gates gave money to schools."]);
+    assert(!a.includes("Bill") && !a.includes("Gates"), a.join(" "));
+    const b = countedWords(["Will it rain today? May we go out?"]);
+    assert(b.includes("Will") && b.includes("May"), b.join(" "));
+  });
+  t("bileşik ya da türetilmiş okunan özel isimler sayılmıyor", () => {
+    const c = countedWords(["They posted it on Facebook and YouTube near Everest in Germany. Mr Smith met Turner. The Assemblies met."]);
+    assert(!["Facebook", "YouTube", "Everest", "Germany", "Turner"].some((w) => c.includes(w)), c.join(" "));
+    assert(c.includes("Assemblies"), "inflected listed word counts");
+  });
+  t("büyük harfli kısaltmalar sayılmıyor", () => {
+    const c = countedWords(["The US and the UN signed it. NATO agreed."]);
+    assert(!c.includes("US") && !c.includes("UN") && !c.includes("NATO"), c.join(" "));
+  });
+  t("küçük harfli aynı kelime etkilenmiyor", () => {
+    const c = countedWords(["George Bush liked the garden. A small bush grew there."]);
+    assert(c.includes("bush"), "the plant counts");
   });
 });
 
