@@ -407,7 +407,9 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
       return null;
     };
     await generateFromHome("Frankfurt Okulu");
-    assert(callsOf("draft")[0].prompt.includes('"phrasal"'), "prompt asks for phrasal verbs");
+    assert(callsOf("draft")[0].prompt.includes('"phrasal"'), "prompt asks for the list");
+    assert(callsOf("draft")[0].prompt.includes("Use 2 to 4 phrasal verbs"), "prompt asks to use a few");
+    eq(A("state.doc.diag.phrasal.listed"), 2, "diagnostics record the list");
     const chips = QA("#endBox .phrasals .pvchip");
     eq(chips.map((c) => c.textContent).join(","), "set out", "only phrasal verbs found in the text are shown");
     chips[0].click();
@@ -426,6 +428,15 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     eq(items.join(","), "set out", "filter shows only phrasal verbs");
     QA("#notebook .chip").find((b) => b.textContent.startsWith("Phrasal verbs")).click();
     noScriptErrors();
+  });
+  t("phrasal verb yoksa bölüm bunu söylüyor; eski metinde bölüm yok", async () => {
+    const d = A("state.library").find((x) => x.title === "About Phrasal Test");
+    A(`openDoc(byId("${d.id}"))`);
+    await waitFor(() => visible("reader"));
+    A("state.doc.phrasal = []; renderEnd()");
+    assert(Q("#endBox .phrasals").textContent.includes("bulunamadı"), "empty list explained");
+    A("delete state.doc.phrasal; renderEnd()");
+    assert(!Q("#endBox .phrasals"), "old text: no section");
   });
   t("silme iki dokunuşla yapılıyor", async () => {
     click('#tabs button[data-v="trees"]');

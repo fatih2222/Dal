@@ -2125,7 +2125,8 @@ Content rules:
 Language rules:
 - ${LEN[state.settings.len] || LEN.normal}, plus a short title.
 - ${v.text}
-${review && review.length ? `- Where they fit the topic naturally, reuse these words the reader is learning: ${review.join(", ")}. Use each one once or twice at most. Skip any that do not fit; never force them.\n` : ""}- ${sentRule(target)}
+${review && review.length ? `- Where they fit the topic naturally, reuse these words the reader is learning: ${review.join(", ")}. Use each one once or twice at most. Skip any that do not fit; never force them.\n` : ""}- Use 2 to 4 phrasal verbs that are common in news and academic English (such as "carry out", "set up", "point out", "take over", "turn out"), where they fit the sentence naturally, at or a little above the reader's level. The reader is learning them.
+- ${sentRule(target)}
 
 Topic terms: if the topic needs specialist terms (for example "hegemony" or "proletariat"), use them freely, explain each one briefly in the text the first time it appears, and list them in "terms".
 
@@ -2133,7 +2134,7 @@ Branches: list 3 to 6 people, concepts, events, institutions, places or works th
 
 "summary": two sentences in English summarising the text.
 "sources": the 1 to 4 English Wikipedia article titles this text is based on, exact titles.
-${PHRASAL_RULE} Use phrasal verbs only where they are natural at the reader's level; never add them to fill this list.
+${PHRASAL_RULE}
 
 Reply with only this JSON:
 {"insufficient": false, "note": "", "title": "...", "summary": "...", "paragraphs": ["...", "..."], "terms": ["..."], "sources": ["..."], "branches": [{"title": "...", "mention": "...", "type": "person", "why": "..."}], "phrasal": [{"text": "...", "lemma": "..."}]}`;
@@ -2404,6 +2405,7 @@ async function generate(topic, ctx) {
       diag: buildDiag(target, draft, revised, paragraphs, terms, units, branches, tGen, ctx),
     };
     const flat = norm(paragraphs.join(" "));
+    d.diag.phrasal = { listed: d.phrasal.length, raw: Array.isArray(out.phrasal) ? out.phrasal.length : -1 };
     d.diag.review = { asked: review, used: review.filter((w) => { const h = norm(w).split(" ")[0]; return flat.includes(h.slice(0, Math.max(4, h.length - 2))); }) };
     if (ctx) {
       d.parentId = ctx.parent.id;
@@ -2568,7 +2570,13 @@ function renderEnd() {
   }
 
   // Phrasal verbs in this text: each opens its card in the text, like a tap would.
+  // Texts made before phrasal verbs were listed have no d.phrasal and show nothing; newer ones always show the section.
   const pvs = (d.phrasal || []).map((p) => ({ p, idx: findPhraseTokens(p.text) })).filter((x) => x.idx);
+  if (Array.isArray(d.phrasal) && !pvs.length) {
+    const sec = el("section", "endsec phrasals");
+    sec.append(el("h2", null, "Bu metindeki phrasal verbs"), el("p", "hint", "Bu metinde phrasal verb bulunamadı."));
+    box.append(sec);
+  }
   if (pvs.length) {
     const sec = el("section", "endsec phrasals");
     sec.append(el("h2", null, "Bu metindeki phrasal verbs"));
