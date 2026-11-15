@@ -393,7 +393,7 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     if (keep.t == null) localStorage.removeItem("dal-theme"); else localStorage.setItem("dal-theme", keep.t);
     if (keep.v == null) localStorage.removeItem("dal-theme-vars"); else localStorage.setItem("dal-theme-vars", keep.v);
   });
-  t("phrasal verbs: metin sonunda listeleniyor, dokununca kart açılıyor, Defter'de ayrı", async () => {
+  t("phrasal verb'ün bir kelimesine dokununca bütün ifade açılıyor, Defter'e doğru anlamıyla giriyor", async () => {
     show_home();
     NET.calls = [];
     NET.override = (c) => {
@@ -407,36 +407,31 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
       return null;
     };
     await generateFromHome("Frankfurt Okulu");
-    assert(callsOf("draft")[0].prompt.includes('"phrasal"'), "prompt asks for the list");
-    assert(callsOf("draft")[0].prompt.includes("Use 2 to 4 phrasal verbs"), "prompt asks to use a few");
-    eq(A("state.doc.diag.phrasal.listed"), 2, "diagnostics record the list");
-    const chips = QA("#endBox .phrasals .pvchip");
-    eq(chips.map((c) => c.textContent).join(","), "set out", "only phrasal verbs found in the text are shown");
-    chips[0].click();
+    const pr = callsOf("draft")[0].prompt;
+    assert(pr.includes('"phrasal"'), "prompt asks for the list");
+    assert(!/Use \d+ to \d+ phrasal verbs/.test(pr), "prompt does not ask to add phrasal verbs");
+    eq(A("state.doc.phrasal").length, 2, "list stored");
+    assert(!Q("#endBox .phrasals"), "no separate section");
+    QA("#article .text .w").find((x) => x.textContent === "set").click();
     await waitFor(() => callsOf("lookup").length && A("state.doc.units").some((u) => u.lemma === "set out"), "card for the phrase");
     NET.override = null;
     const lk = callsOf("lookup")[0].prompt;
     assert(lk.includes('"set out"'), "the whole phrase is looked up: " + lk.slice(0, 200));
-    assert(A("state.nb.words")["set out"], "added to the notebook");
+    const w = A("state.nb.words")["set out"];
+    assert(w && w.type === "phrasal" && w.tr === "yola koyulmak", "notebook has the phrasal verb with its meaning");
+    A("closeCard()");
+    NET.calls = [];
+    QA("#article .text .w").find((x) => x.textContent === "out").click();
+    await wait(300);
+    eq(callsOf("lookup").length, 0, "tapping the other word reuses the card");
     A("closeCard()");
     click('#tabs button[data-v="notebook"]');
     await waitFor(() => visible("notebook"));
-    const pv = QA("#notebook .chip").find((b) => b.textContent.startsWith("Phrasal verbs"));
-    assert(pv, "phrasal filter shown");
-    pv.click();
-    const items = QA("#notebook .nblist .nbl").map((x) => x.textContent);
-    eq(items.join(","), "set out", "filter shows only phrasal verbs");
-    QA("#notebook .chip").find((b) => b.textContent.startsWith("Phrasal verbs")).click();
+    assert(!QA("#notebook .chip").some((b) => b.textContent.startsWith("Phrasal verbs")), "no separate filter");
+    const it = QA("#notebook .nbitem").find((x) => x.querySelector(".nbl").textContent === "set out");
+    it.querySelector(".nbhead").click();
+    assert(it.textContent.includes("phrasal verb"), "kind shown");
     noScriptErrors();
-  });
-  t("phrasal verb yoksa bölüm bunu söylüyor; eski metinde bölüm yok", async () => {
-    const d = A("state.library").find((x) => x.title === "About Phrasal Test");
-    A(`openDoc(byId("${d.id}"))`);
-    await waitFor(() => visible("reader"));
-    A("state.doc.phrasal = []; renderEnd()");
-    assert(Q("#endBox .phrasals").textContent.includes("bulunamadı"), "empty list explained");
-    A("delete state.doc.phrasal; renderEnd()");
-    assert(!Q("#endBox .phrasals"), "old text: no section");
   });
   t("silme iki dokunuşla yapılıyor", async () => {
     click('#tabs button[data-v="trees"]');

@@ -171,7 +171,6 @@ body.picking article{padding-bottom:40vh}
 .tapchip{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:.35rem .8rem;cursor:pointer;font-family:Literata,Georgia,serif;font-size:1rem}
 .tapchip.known{text-decoration:line-through;color:var(--muted);background:none}
 .tapchip.free{font-style:italic;color:var(--muted)}
-.tapchip.looked{text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px}
 .hint{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
 .result p{margin:.35rem 0}
 .bitem{margin:0 0 .6rem}
@@ -2125,8 +2124,7 @@ Content rules:
 Language rules:
 - ${LEN[state.settings.len] || LEN.normal}, plus a short title.
 - ${v.text}
-${review && review.length ? `- Where they fit the topic naturally, reuse these words the reader is learning: ${review.join(", ")}. Use each one once or twice at most. Skip any that do not fit; never force them.\n` : ""}- Use 2 to 4 phrasal verbs that are common in news and academic English (such as "carry out", "set up", "point out", "take over", "turn out"), where they fit the sentence naturally, at or a little above the reader's level. The reader is learning them.
-- ${sentRule(target)}
+${review && review.length ? `- Where they fit the topic naturally, reuse these words the reader is learning: ${review.join(", ")}. Use each one once or twice at most. Skip any that do not fit; never force them.\n` : ""}- ${sentRule(target)}
 
 Topic terms: if the topic needs specialist terms (for example "hegemony" or "proletariat"), use them freely, explain each one briefly in the text the first time it appears, and list them in "terms".
 
@@ -2569,29 +2567,6 @@ function renderEnd() {
     box.append(sec);
   }
 
-  // Phrasal verbs in this text: each opens its card in the text, like a tap would.
-  // Texts made before phrasal verbs were listed have no d.phrasal and show nothing; newer ones always show the section.
-  const pvs = (d.phrasal || []).map((p) => ({ p, idx: findPhraseTokens(p.text) })).filter((x) => x.idx);
-  if (Array.isArray(d.phrasal) && !pvs.length) {
-    const sec = el("section", "endsec phrasals");
-    sec.append(el("h2", null, "Bu metindeki phrasal verbs"), el("p", "hint", "Bu metinde phrasal verb bulunamadı."));
-    box.append(sec);
-  }
-  if (pvs.length) {
-    const sec = el("section", "endsec phrasals");
-    sec.append(el("h2", null, "Bu metindeki phrasal verbs"));
-    const chips = el("div", "tapchips");
-    pvs.forEach(({ p, idx }) => {
-      const looked = d.taps.some((t) => t.key === "u:" + norm(p.lemma) && !t.known);
-      const c = el("button", "tapchip pvchip" + (looked ? " looked" : ""), p.lemma);
-      c.type = "button";
-      c.onclick = () => openPhrasal(p, idx);
-      chips.append(c);
-    });
-    sec.append(chips, el("p", "hint", "Dokununca metindeki yeri ve anlamı açılır; baktığın sayılır ve Defter’e düşer. Altı çizili olanlara zaten baktın."));
-    box.append(sec);
-  }
-
   // Finish / result
   const fin = el("section", "endsec result");
   if (!d.finished) {
@@ -2792,12 +2767,13 @@ function singleUnitAt(i) {
   return best;
 }
 // Token indices of a phrase as written ("carried out", "turn it off"): its words in order within one sentence,
-// at most 3 other words apart. Null when the text does not contain it (a revision may have changed the wording).
-function findPhraseTokens(text) {
+// at most 3 other words apart. With `at`, only an occurrence that includes that token counts.
+// Null when the text does not contain it (a revision may have changed the wording).
+function findPhraseTokens(text, at) {
   const ws = (String(text).match(WORD_RE) || []).map(norm);
   const T = state.tokens;
   if (!ws.length || !T) return null;
-  for (let i = 0; i < T.length; i++) {
+  for (let i = at == null ? 0 : Math.max(0, at - 6); i < T.length && (at == null || i <= at); i++) {
     if (T[i].low !== ws[0]) continue;
     const idx = [i];
     for (let k = 1; k < ws.length; k++) {
@@ -2807,17 +2783,27 @@ function findPhraseTokens(text) {
       if (f < 0) break;
       idx.push(f);
     }
-    if (idx.length === ws.length) return idx;
+    if (idx.length === ws.length && (at == null || idx.includes(at))) return idx;
   }
   return null;
 }
-function openPhrasal(p, idx) {
-  const k = state.doc.units.findIndex((u) => norm(u.lemma) === norm(p.lemma));
-  state.tokens[idx[0]].el.scrollIntoView({ block: "center" });
-  if (k >= 0) selectUnit(k, idx[0]);
-  else lookup(idx, true);
+// A tapped word inside one of the text's phrasal verbs opens the whole phrasal verb, so the card and the
+// notebook get its real meaning ("carried" in "carried out" → carry out, not carry).
+function phrasalAt(i) {
+  for (const p of state.doc.phrasal || []) {
+    const idx = findPhraseTokens(p.text, i);
+    if (idx) return { p, idx };
+  }
+  return null;
 }
 function tapWord(i) {
+  const pv = phrasalAt(i);
+  if (pv) {
+    const k = state.doc.units.findIndex((u) => norm(u.lemma) === norm(pv.p.lemma));
+    if (k >= 0) selectUnit(k, i);
+    else lookup(pv.idx, true);
+    return;
+  }
   const k = singleUnitAt(i);
   if (k >= 0) selectUnit(k, i);
   else lookup([i], true);
@@ -3672,15 +3658,6 @@ function renderNotebook() {
     b.onclick = () => { state.nbF = k; renderNotebook(); };
     filters.append(b);
   });
-  // Phrasal verbs as their own group, on top of the status filter.
-  const nPv = all.filter((w) => w.type === "phrasal").length;
-  if (nPv || state.nbPv) {
-    const pv = el("button", "chip", `Phrasal verbs ${nPv}`);
-    pv.type = "button";
-    pv.setAttribute("aria-pressed", String(!!state.nbPv));
-    pv.onclick = () => { state.nbPv = !state.nbPv; renderNotebook(); };
-    filters.append(pv);
-  }
   const sort = el("button", "chip", state.nbSort === "az" ? "Sıra: A–Z" : "Sıra: son eklenen");
   sort.type = "button";
   sort.onclick = () => { state.nbSort = state.nbSort === "az" ? "recent" : "az"; renderNotebook(); };
@@ -3693,7 +3670,6 @@ function renderNotebook() {
     list.innerHTML = "";
     const qq = norm(q.value);
     const ws = all.filter((w) => cur === "all" || w.status === cur)
-      .filter((w) => !state.nbPv || w.type === "phrasal")
       .filter((w) => !qq || norm(w.lemma).includes(qq) || norm(w.tr || "").includes(qq))
       .sort(state.nbSort === "az" ? (a, b) => a.lemma.localeCompare(b.lemma) : (a, b) => (b.lastAt || 0) - (a.lastAt || 0));
     ws.forEach((w) => list.append(nbItem(w)));
