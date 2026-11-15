@@ -241,7 +241,7 @@ suite("Akış: kendi metnini getir", (t) => {
     const tc = callsOf("transcribe")[0];
     eq(tc.model, "claude-sonnet-5-5"); eq(tc.images, 1);
     click("#impGo");
-    await waitFor(() => visible("importdoc"), "import page");
+    await waitFor(() => visible("importdoc") || visible("reader"), "import page or reader");
     eq(A("state.imports[0].source"), "photo");
   });
   t("metinli PDF: telefonda bedava okunuyor", async () => {
@@ -262,8 +262,31 @@ suite("Akış: kendi metnini getir", (t) => {
     const tc = callsOf("transcribe");
     eq(tc.length, 1, "one transcribe call"); eq(tc[0].images, 2, "two page images"); eq(tc[0].model, "claude-sonnet-5-5");
     click("#impGo");
-    await waitFor(() => visible("importdoc"));
+    await waitFor(() => visible("importdoc") || visible("reader"));
     eq(A("state.imports[0].source"), "scan");
+    noScriptErrors();
+  });
+  t("tek parçalı metin doğrudan açılıyor; terimler alınamazsa puan takılı kalmıyor", async () => {
+    NET.calls = [];
+    NET.override = (c) => (c.kind === "terms" ? { status: 401 } : null);
+    click("#impOpen");
+    Q("#impTitle").value = "Short Note";
+    Q("#impText").value = "The printing press changed the way ideas moved across Europe. Before it, books were copied by hand, which was slow and expensive. Only rich people could own many books. Then a new machine made it possible to print hundreds of copies quickly, so prices fell, more people learned to read, and new ideas spread across the continent within a few years.";
+    click("#impGo");
+    await waitFor(() => visible("reader"), "reader opened directly");
+    eq(A("state.doc.title"), "Short Note");
+    await waitFor(() => Q("#article .lvl").textContent.includes("yaklaşık"), "provisional score line");
+    NET.override = null;
+    assert(!Q("#article .lvl").textContent.includes("hesaplanıyor"), "not stuck");
+  });
+  t("tek parçalı metinde geri Kitaplık'a dönüyor; belge sayfası sade", async () => {
+    click("#abBack");
+    await waitFor(() => visible("library"), "back to library");
+    A("showImport(state.imports[0].id)");
+    await waitFor(() => visible("importdoc"));
+    eq(Q("#importdoc .bookdel").textContent, "Metni sil");
+    assert(!Q("#importdoc .auditnote"), "no clean-audit line");
+    assert(!/bölüm/.test(Q("#importdoc .lvl").textContent), "no section count");
     noScriptErrors();
   });
 });

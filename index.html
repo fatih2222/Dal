@@ -1173,7 +1173,7 @@ function makeSample() {
   sample.limits = async () => ({ images: { maxCount: 10 } });
   return sample;
 }
-const NO_KEY = "Önce ana ekrandaki “API anahtarı” bölümünden anahtarını gir.";
+const NO_KEY = "Önce API anahtarını gir: ana ekranda sağ üstteki dişli simgesi, Ayarlar.";
 
 /* Wikipedia: finds the English article for a topic and returns its plain text. */
 function wiki(lang, params, signal) {
@@ -1726,7 +1726,7 @@ function renderShelf() {
     b.onclick = () => (imp.sections.length === 1 && byId(imp.sections[0]) ? openDoc(byId(imp.sections[0])) : showImport(imp.id));
     box.append(b);
   });
-  if (!state.imports.length) box.append(el("p", "shelfempty", "Henüz kitap yok. Oku sekmesindeki “Kendi metnini getir” ile bir PDF ya da metin ekle; ilk sayfası kapak olarak burada görünür."));
+  if (!state.imports.length) box.append(el("p", "shelfempty", "Henüz kitap yok. Oku sekmesindeki “Kendi metnin” kartından bir PDF ya da metin ekle; ilk sayfası kapak olarak burada görünür."));
 
 }
 async function deleteDocs(ids) {
@@ -2284,7 +2284,7 @@ function errorCopy(e, what) {
   logErr(what, e);
   const c = e && e.code;
   if (c === "no_key") return NO_KEY;
-  if (c === "bad_key") return "API anahtarı geçersiz görünüyor. Ana ekrandaki “API anahtarı” bölümünden kontrol et.";
+  if (c === "bad_key") return "API anahtarı geçersiz görünüyor. Ana ekranda sağ üstteki dişli simgesinden (Ayarlar) kontrol et.";
   if (c === "forbidden") return "Bu API anahtarının bu işlem için izni yok.";
   if (c === "offline") return "İnternet bağlantısı yok. Bağlanınca tekrar dene.";
   if (c === "network" || c === "wiki_network") return "Sunucuya ulaşılamadı. Bağlantını kontrol edip tekrar dene.";
@@ -3876,7 +3876,9 @@ function createImport(title, secs, source, cover, chapterTitles) {
   state.imports.unshift(imp);
   saveDoc(imp);
   $("#impText").value = ""; $("#impTitle").value = ""; impMsg("");
-  showImport(imp.id);
+  // A one-part text needs no book page: open it straight away; back then leads to the library, where it now sits.
+  if (imp.sections.length === 1) { show("library"); renderLibrary(); openDoc(byId(imp.sections[0])); }
+  else showImport(imp.id);
 }
 // Book chapters from the PDF's own bookmarks. Returns [{title, page}] (0-based pages) or null.
 const SKIP_CHAPTER = /^(cover|front ?cover|back ?cover|title( page)?|half[- ]title|copyright|contents|table of contents|dedication|epigraph|list of (figures|tables|illustrations|abbreviations)|abbreviations|index|subject index|name index|bibliography|references|works cited|further reading|notes|endnotes|acknowledg(e)?ments?|about the (author|authors|book)|also by|praise for|series page|permissions|credits)\b/i;
@@ -4056,9 +4058,12 @@ function showImport(id) {
   box.innerHTML = "";
   const secs = imp.sections.map(byId).filter(Boolean);
   const done = secs.filter((d) => d.finished).length;
+  const single = secs.length === 1;
   const head = el("div", "dochead"), info = el("div");
+  const parts = single ? (done ? ", okundu" : "") : `, ${imp.chapters && imp.chapters.length ? `${imp.chapters.length} bölüm, ${secs.length} parça` : `${secs.length} bölüm`}`;
+  const doneNote = single ? "" : `, ${done} ${imp.chapters && imp.chapters.length ? "parça" : "bölüm"} bitti`;
   info.append(el("h1", null, imp.title),
-    el("p", "lvl", `${SRC_TR[imp.source] || "belge"}, ${imp.chapters && imp.chapters.length ? `${imp.chapters.length} bölüm, ${secs.length} parça` : `${secs.length} bölüm`}, yaklaşık ${imp.words.toLocaleString("tr-TR")} kelime, ${done} ${imp.chapters && imp.chapters.length ? "parça" : "bölüm"} bitti.${imp.cut ? " Belge çok uzun olduğu için ilk 250.000 kelimesi alındı." : ""}`));
+    el("p", "lvl", `${SRC_TR[imp.source] || "belge"}, yaklaşık ${imp.words.toLocaleString("tr-TR")} kelime${parts}${doneNote}.${imp.cut ? " Belge çok uzun olduğu için ilk 250.000 kelimesi alındı." : ""}`));
   head.append(coverEl(imp), info);
   box.append(head);
   const next = secs.find((d) => !d.finished);
@@ -4072,12 +4077,13 @@ function showImport(id) {
   // Automatic check of the extracted text: flags parts that look broken so they can be reported and fixed.
   const audits = new Map(secs.map((d) => [d.id, auditPart(d)]));
   const flagged = secs.filter((d) => audits.get(d.id).length);
-  const note = el("p", "auditnote" + (flagged.length ? " warn" : ""));
+  // Only shown when something looks broken; a clean result is not worth a line.
   if (flagged.length) {
     const kinds = [...new Set(flagged.flatMap((d) => audits.get(d.id)))];
-    note.textContent = `Otomatik kontrol: ${flagged.length} parçada olası metin bozukluğu var (${kinds.join(", ")}). Bu parçalar listede “kontrol et” diye işaretli.`;
-  } else note.textContent = "Otomatik kontrol: metinde bozukluk bulunmadı.";
-  box.append(note);
+    box.append(el("p", "auditnote warn", single
+      ? `Otomatik kontrol: metinde olası bozukluk var (${kinds.join(", ")}).`
+      : `Otomatik kontrol: ${flagged.length} parçada olası metin bozukluğu var (${kinds.join(", ")}). Bu parçalar listede “kontrol et” diye işaretli.`));
+  }
   const partRow = (d) => {
     const li = el("li");
     const b = el("button", "tt", d.title);
@@ -4112,13 +4118,14 @@ function showImport(id) {
     ol.append(partRow(d));
   });
   box.append(ol);
-  const del = el("button", "bookdel", "Kitabı sil");
+  const delLabel = single ? "Metni sil" : "Kitabı sil";
+  const del = el("button", "bookdel", delLabel);
   del.type = "button";
   let dt;
   del.onclick = () => {
     if (!del.classList.contains("sure")) {
-      del.classList.add("sure"); del.textContent = "Emin misin? Kitap ve okuma kayıtları silinir";
-      dt = setTimeout(() => { del.classList.remove("sure"); del.textContent = "Kitabı sil"; }, 3500);
+      del.classList.add("sure"); del.textContent = `Emin misin? ${single ? "Metin" : "Kitap"} ve okuma kayıtları silinir`;
+      dt = setTimeout(() => { del.classList.remove("sure"); del.textContent = delLabel; }, 3500);
       return;
     }
     clearTimeout(dt);
@@ -4196,8 +4203,18 @@ Reply with only this JSON:
 }
 // Cards for an original section are prepared in the background the first time it is opened.
 const prepping = new Set();
+// Sections whose preparation failed in this session: their line shows a provisional score instead of
+// "hesaplanıyor…" forever. Opening the section again retries.
+const prepFailed = new Set();
+function prepFail(d) {
+  prepFailed.add(d.id);
+  const lv = state.doc === d && $("#article .lvl");
+  if (lv) lv.textContent = lvlLine(d);
+}
 async function prepareOrigUnits(d) {
-  if (!state.sample || prepping.has(d.id)) return;
+  if (prepping.has(d.id)) return;
+  if (!state.sample) return prepFail(d);
+  prepFailed.delete(d.id);
   prepping.add(d.id);
   const lvl = scoreName(d.target);
   try {
@@ -4221,13 +4238,14 @@ Reply with only this JSON:
       if (lv) lv.textContent = lvlLine(d);
       renderEnd();
     }
-  } catch (e) { logErr("prepare", e); } finally { prepping.delete(d.id); }
+  } catch (e) { logErr("prepare", e); prepFail(d); } finally { prepping.delete(d.id); }
 }
 function lvlLine(d) {
   const sc = `${round(state.m.score)} (${state.m.score >= 100 ? "liste dışı" : scoreName(state.m.score)})`;
   if (!d.importId) return `Hedef ${d.target}, metin puanı ${sc}`;
   if (d.mode === "adapt") return `Seviyene uyarlanmış: hedef ${d.target}, metin puanı ${sc}`;
   // The score is only final once the section's technical terms are known; before that it would jump.
+  if (!d.unitsReady && prepFailed.has(d.id)) return `Orijinal metin, puanı yaklaşık ${sc}. Konu terimleri ayrılamadı${state.sample ? "; metni yeniden açınca tekrar denenir" : " (API anahtarı gerekiyor)"}.`;
   if (!d.unitsReady) return "Orijinal metin, puan hesaplanıyor…";
   return `Orijinal metin, puanı ${sc}`;
 }
