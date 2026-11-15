@@ -393,6 +393,40 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     if (keep.t == null) localStorage.removeItem("dal-theme"); else localStorage.setItem("dal-theme", keep.t);
     if (keep.v == null) localStorage.removeItem("dal-theme-vars"); else localStorage.setItem("dal-theme-vars", keep.v);
   });
+  t("phrasal verbs: metin sonunda listeleniyor, dokununca kart açılıyor, Defter'de ayrı", async () => {
+    show_home();
+    NET.calls = [];
+    NET.override = (c) => {
+      if (c.kind === "draft") {
+        const d = FIX.draft("Phrasal Test");
+        d.paragraphs[1] = d.paragraphs[1].replace("They wanted to study society", "They set out to study society");
+        d.phrasal = [{ text: "set out", lemma: "set out" }, { text: "gave up", lemma: "give up" }];
+        return { text: JSON.stringify(d) };
+      }
+      if (c.kind === "lookup") return { text: JSON.stringify({ text: "set out", lemma: "set out", type: "phrasal", forms: ["set out", "sets out"], def: "to start trying to do something", tr: "yola koyulmak", cefr: "B2", sentence_tr: "Toplumu incelemeye [[koyuldular]]." }) };
+      return null;
+    };
+    await generateFromHome("Frankfurt Okulu");
+    assert(callsOf("draft")[0].prompt.includes('"phrasal"'), "prompt asks for phrasal verbs");
+    const chips = QA("#endBox .phrasals .pvchip");
+    eq(chips.map((c) => c.textContent).join(","), "set out", "only phrasal verbs found in the text are shown");
+    chips[0].click();
+    await waitFor(() => callsOf("lookup").length && A("state.doc.units").some((u) => u.lemma === "set out"), "card for the phrase");
+    NET.override = null;
+    const lk = callsOf("lookup")[0].prompt;
+    assert(lk.includes('"set out"'), "the whole phrase is looked up: " + lk.slice(0, 200));
+    assert(A("state.nb.words")["set out"], "added to the notebook");
+    A("closeCard()");
+    click('#tabs button[data-v="notebook"]');
+    await waitFor(() => visible("notebook"));
+    const pv = QA("#notebook .chip").find((b) => b.textContent.startsWith("Phrasal verbs"));
+    assert(pv, "phrasal filter shown");
+    pv.click();
+    const items = QA("#notebook .nblist .nbl").map((x) => x.textContent);
+    eq(items.join(","), "set out", "filter shows only phrasal verbs");
+    QA("#notebook .chip").find((b) => b.textContent.startsWith("Phrasal verbs")).click();
+    noScriptErrors();
+  });
   t("silme iki dokunuşla yapılıyor", async () => {
     click('#tabs button[data-v="trees"]');
     await waitFor(() => visible("trees"));

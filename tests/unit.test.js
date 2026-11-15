@@ -72,6 +72,20 @@ suite("Kelime seviyeleri (Aşama 2)", (t) => {
     assert(!info("the").freq, "list words are not marked");
     eq(info("xqzzv"), null, "nonsense stays off-list");
   });
+  t("anlamı parçalarından çıkmayan kelimeler sıklık seviyesini alıyor", () => {
+    eq(lv("undermine"), 4, "undermine = B2, not under + mine");
+    assert(lv("undermined") >= 4, "inflected form too");
+    assert(lv("hideous") >= 4, "hideous is not hide + ous");
+    assert(info("aftermath").opaque, "marked");
+    eq(lv("smartphones"), 2, "transparent compound left to the rules");
+    eq(lv("summertime"), 2, "transparent compound left to the rules");
+  });
+  t("phrasal verb listesi temizleniyor", () => {
+    const c = A("cleanPhrasal")([{ text: "carried out", lemma: "Carry Out" }, { text: "carry out", lemma: "carry out" }, { text: "", lemma: "x" }, null, { text: "gave up", lemma: "give up" }]);
+    eq(c.length, 2, "duplicates and empty ones dropped");
+    eq(c[0].lemma, "carry out"); eq(c[0].text, "carried out");
+    eq(A("cleanPhrasal")("nope").length, 0);
+  });
   t("sıklık seviyeleri puan ölçeğini değiştirmiyor", () => {
     let n = 0; A("LEXMAP").forEach(() => n++);
     const c = A("FREQMAP"); let overlap = 0; c.forEach((_, w) => { if (A("LEXMAP").has(w)) overlap++; });
