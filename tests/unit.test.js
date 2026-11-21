@@ -337,6 +337,48 @@ suite("Okur seviyesi", (t) => {
   });
 });
 
+suite("Tekrar planı", (t) => {
+  // Runs with a throwaway notebook and puts the real one back.
+  const withWords = (words, fn) => {
+    const nb = A("state.nb"), keep = nb.words;
+    nb.words = {};
+    words.forEach((w) => { nb.words[w.key] = w; });
+    try { return fn(nb.words); } finally { nb.words = keep; }
+  };
+  const W = (key, due, extra) => Object.assign({ key, lemma: key, recall: due ? { n: 0, streak: 0, okDates: [], due } : undefined }, extra || {});
+  t("yeni kelime ertesi güne, gün doluysa sonrakine", () => {
+    const today = A("today")(), add = A("addDays");
+    withWords([], () => eq(A("planDay")(1), add(today, 1), "tomorrow"));
+    const full = Array.from({ length: 20 }, (_, i) => W("w" + i, add(today, 1)));
+    withWords(full, () => eq(A("planDay")(1), add(today, 2), "day after when tomorrow is full"));
+  });
+  t("uzun aralık hedef güne, doluysa en fazla %10 kayar", () => {
+    const today = A("today")(), add = A("addDays");
+    withWords([], () => eq(A("planDay")(16), add(today, 16)));
+    const full = Array.from({ length: 20 }, (_, i) => W("w" + i, add(today, 16)));
+    withWords(full, () => { const d = A("daysBetween")(today, A("planDay")(16)); assert(d !== 16 && d >= 14 && d <= 18, "moved within ±2: " + d); });
+  });
+  t("plansız kelimeler günde en fazla 20 olacak şekilde dağıtılıyor", () => {
+    const today = A("today")(), add = A("addDays"), now = Date.now(), DAY = 86400000;
+    const ws = Array.from({ length: 45 }, (_, i) => W("old" + i, null, { lastAt: now - 10 * DAY + i }));
+    ws.push(W("fresh", null, { lastAt: now }));
+    ws.push(W("late", null, { recall: { n: 2, streak: 1, okDates: [], dueAt: now - 3 * DAY } }));
+    ws.push(W("later", null, { recall: { n: 2, streak: 1, okDates: [], dueAt: now + 5 * DAY } }));
+    withWords(ws, (words) => {
+      assert(A("scheduleMissing")(), "something scheduled");
+      const c = {};
+      Object.values(words).forEach((w) => { c[w.recall.due] = (c[w.recall.due] || 0) + 1; });
+      eq(words.late.recall.due, today, "overdue stays on today");
+      eq(words.later.recall.due, A("dayStr")(now + 5 * DAY), "planned day kept");
+      assert(!("dueAt" in words.late.recall), "old field removed");
+      assert(words.fresh.recall.due > today, "looked up today: not before tomorrow");
+      eq(c[today], 20, "today: late + 19 old ones");
+      eq(c[add(today, 1)], 20, "tomorrow full");
+      assert(!A("scheduleMissing")(), "second run does nothing");
+    });
+  });
+});
+
 suite("Hata mesajları", (t) => {
   for (const [code, piece] of [["no_key", "API anahtarı"], ["bad_key", "geçersiz"], ["offline", "İnternet"], ["overloaded", "yoğun"], ["rate_limited", "Çok sık"], ["refusal", "reddedildi"], ["invalid_json", "beklenen biçimde"]]) {
     t(`${code} için Türkçe mesaj`, () => assert(A("errorCopy")({ code }, "Metin").includes(piece), A("errorCopy")({ code }, "Metin")));

@@ -546,6 +546,37 @@ article h1{margin-top:.3rem}
 .rvcard .acts{gap:.6rem}
 .rvcard .acts button{padding:.75rem 1.2rem;font-weight:700;border-radius:14px;flex:1 1 auto}
 #placement .rvcard .acts button{flex:1 1 40%}
+/* Review home: calendar and word list */
+.rvtabs{gap:.5rem;margin:.2rem 0 .4rem}
+.rvtoday .rvnow{font-weight:700;margin:.1rem 0 .5rem}
+.rvtoday .rvdone{margin:0 0 .4rem;color:var(--accent);font-weight:600}
+.rvtoday .hint{margin:.5rem 0 0}
+.cal{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:.75rem .6rem;margin-top:1rem;box-shadow:var(--sh-1)}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin:0 .2rem .5rem}
+.calhead b{font-weight:700;text-transform:capitalize}
+.calnav{background:var(--bg);border:1px solid var(--line);border-radius:999px;width:2.3rem;height:2.3rem;cursor:pointer;color:var(--ink);font-size:1.15rem;line-height:1}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.calwd{font-size:.72rem;color:var(--muted);text-align:center;padding:.15rem 0}
+.calday{min-height:3.4rem;min-width:0;border:1px solid transparent;border-radius:10px;background:var(--bg);padding:.25rem .1rem;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;color:var(--ink);font:inherit;overflow:hidden}
+.calday .n{font-size:.85rem;font-weight:600}
+.calday .b{font-size:.66rem;line-height:1.15;white-space:nowrap;min-height:.76rem}
+.calday .bm{color:var(--accent)}
+.calday .bd{color:var(--muted)}
+.calday.past .n{color:var(--muted)}
+.calday.today{border-color:var(--accent)}
+.calday[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.calday.out{visibility:hidden}
+.callegend{font-size:.74rem;color:var(--muted);margin:.6rem .2rem 0;line-height:1.4}
+.caldetail{margin-top:1.2rem}
+.caldetail h2{font-size:1.1rem;margin:0 0 .4rem;text-transform:none}
+.caldetail h3{font-size:.9rem;color:var(--muted);font-weight:600;margin:1rem 0 .4rem}
+.wlist{margin:.3rem 0 1rem}
+.wrow{display:flex;justify-content:space-between;align-items:baseline;gap:.8rem;padding:.6rem .9rem;border-bottom:1px solid var(--line)}
+.wrow:last-child{border-bottom:0}
+.wrow .wl{font-family:Literata,Georgia,serif;font-weight:600;overflow-wrap:anywhere}
+.wrow .wm{font-size:.82rem;color:var(--muted);text-align:right}
+.wgroups,.wlevels{gap:.4rem;margin:.6rem 0}
+.wlevels .chip{padding:.3rem .65rem;font-size:.85rem}
 .imptext{box-shadow:var(--sh-1)}
 #importv .acts{gap:.6rem}
 #importv .acts button,.filebtn{border-radius:14px;padding:.75rem 1.1rem;font-weight:700}
@@ -1480,6 +1511,7 @@ async function loadAll() {
     const nb = all.find((d) => d.kind === "notebook");
     if (nb && nb.words) { state.nb = nb; nbUpgrade(); }
     else nbMigrate();
+    if (scheduleMissing()) saveNb();
     const oldLog = all.find((d) => d.kind === "errlog");
     if (oldLog && Array.isArray(oldLog.items)) state.errlog = oldLog.items.concat(state.errlog || []).slice(-40);
     autoSnapshot(all.filter((d) => d.kind === "snapshot").sort((a, b) => b.at - a.at));
@@ -1787,7 +1819,7 @@ function restoreFor(view) {
   if (view === "tree") { const r = state.treeRoot; return () => showTree(r); }
   if (view === "importdoc") { const id = state.curImport; return () => showImport(id); }
   if (view === "notebook") return () => { show("notebook"); renderNotebook(); };
-  if (view === "review") return () => startReview();
+  if (view === "review") return () => showReviewHome();
   if (view === "placement") return () => { state.pt = null; show("placement"); renderPlacement(); };
   if (view === "loading") return () => show("home");
   return () => show(view);
@@ -1909,7 +1941,7 @@ function openTab(v) {
   else if (v === "trees") show("trees");
   else if (v === "library") show("library");
   else if (v === "notebook") { show("notebook"); renderNotebook(); }
-  else startReview();
+  else showReviewHome();
 }
 function goTab(v) { closeOverlays(); openTab(v); }
 document.querySelectorAll("#tabs button").forEach((b) => { b.onclick = () => goTab(b.dataset.v); });
@@ -3355,7 +3387,8 @@ function nbAdd(u, d, sentence, guess) {
   w.guess = !!guess;
   w.enc = 0;
   w.seen = 0;
-  if (w.recall) { w.recall.streak = 0; w.recall.okDates = []; w.recall.dueAt = 0; }
+  // Looked up (again): the review plan starts over, first review tomorrow.
+  w.recall = { n: (w.recall && w.recall.n) || 0, streak: 0, okDates: [], due: planDay(1, key) };
   w.status = nbStatus(w);
   state.nb.words[key] = w;
   saveNb();
@@ -3414,7 +3447,51 @@ function reviewWords() {
 /* Status and spaced recall */
 const DAY = 86400000;
 const INTERVALS = [1, 3, 7, 16, 35, 80];
-const today = () => new Date().toISOString().slice(0, 10);
+// Planned reviews per day. A soft limit: a word only moves to another day when its day is full, and overdue
+// words always stay on today.
+const RV_CAP = 20;
+// Review days are local calendar days ("2026-11-21"), so "tomorrow" starts at midnight, not 24 hours later.
+const dayStr = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const today = () => dayStr(Date.now());
+const addDays = (s, n) => { const [y, m, d] = s.split("-").map(Number); return dayStr(new Date(y, m - 1, d + n).getTime()); };
+const daysBetween = (a, b) => Math.round((new Date(b + "T12:00") - new Date(a + "T12:00")) / DAY);
+function dueLoad(skipKey) {
+  const c = {};
+  Object.values(state.nb.words).forEach((w) => { const d = w.key !== skipKey && w.recall && w.recall.due; if (d) c[d] = (c[d] || 0) + 1; });
+  return c;
+}
+// The review day for a word due `interval` days from today: the target day if it has room, otherwise the nearest
+// day with room. Short intervals may only move one day later; longer ones about 10% either way. Never before tomorrow.
+function planDay(interval, skipKey) {
+  const load = dueLoad(skipKey), t = today();
+  const f = interval <= 2 ? 0 : Math.max(1, Math.round(interval * 0.1));
+  const lo = Math.max(1, interval - f), hi = interval + (interval <= 2 ? 1 : f);
+  const order = [interval];
+  for (let k = 1; k <= hi - lo; k++) { if (interval + k <= hi) order.push(interval + k); if (interval - k >= lo) order.push(interval - k); }
+  const free = order.find((n) => (load[addDays(t, n)] || 0) < RV_CAP);
+  if (free != null) return addDays(t, free);
+  return addDays(t, order.reduce((b, n) => ((load[addDays(t, n)] || 0) < (load[addDays(t, b)] || 0) ? n : b), interval));
+}
+// Gives every word without a review day one: older plans keep their day (overdue ones move to today); words never
+// planned are spread from today on, oldest first, at most RV_CAP a day. Words looked up today start tomorrow.
+function scheduleMissing() {
+  const todo = Object.values(state.nb.words).filter((w) => !(w.recall && w.recall.due));
+  if (!todo.length) return false;
+  const t = today(), load = dueLoad();
+  todo.sort((a, b) => (a.lastAt || a.firstAt || 0) - (b.lastAt || b.firstAt || 0)).forEach((w) => {
+    const r = w.recall || (w.recall = { n: 0, streak: 0, okDates: [] });
+    let d;
+    if (r.dueAt) d = dayStr(r.dueAt) < t ? t : dayStr(r.dueAt);
+    else {
+      d = dayStr(w.lastAt || w.firstAt || Date.now()) >= t ? addDays(t, 1) : t;
+      for (let i = 0; i < 400 && (load[d] || 0) >= RV_CAP; i++) d = addDays(d, 1);
+    }
+    delete r.dueAt;
+    r.due = d;
+    load[d] = (load[d] || 0) + 1;
+  });
+  return true;
+}
 // Reading research suggests 8–12 encounters for incidental learning; a successful recall counts for more than an encounter.
 function nbStatus(w) {
   const enc = w.enc || 0, texts = (w.seenIn || []).length, ok = ((w.recall && w.recall.okDates) || []).length;
@@ -3431,21 +3508,28 @@ function nbUpgrade() {
   });
   if (changed) saveNb();
 }
+const dueOf = (w) => (w.recall && w.recall.due) || today();
 function dueWords() {
-  const now = Date.now();
+  const t = today();
   return Object.values(state.nb.words)
-    .filter((w) => !w.recall || (w.recall.dueAt || 0) <= now)
-    .sort((a, b) => ((a.recall && a.recall.dueAt) || 0) - ((b.recall && b.recall.dueAt) || 0) || (a.lastAt || 0) - (b.lastAt || 0));
+    .filter((w) => dueOf(w) <= t)
+    .sort((a, b) => dueOf(a).localeCompare(dueOf(b)) || (a.lastAt || 0) - (b.lastAt || 0));
 }
 function dueLabel(w) {
-  const t = (w.recall && w.recall.dueAt) || 0;
-  const days = Math.ceil((t - Date.now()) / DAY);
-  return days <= 0 ? "şimdi" : days === 1 ? "yarın" : `${days} gün sonra`;
+  const days = daysBetween(today(), dueOf(w));
+  return days <= 0 ? "bugün" : days === 1 ? "yarın" : `${days} gün sonra`;
+}
+// The Tekrar tab opens on the calendar; a session starts from its button (or from the notebook).
+function showReviewHome() {
+  state.rv = null;
+  show("review");
+  renderReview();
 }
 function startReview() {
-  const queue = dueWords().slice(0, 10).map((w) => w.key);
-  if (!queue.length) { state.rv = null; show("review"); renderReview(); return; }
+  const queue = dueWords().slice(0, 50).map((w) => w.key);
+  if (!queue.length) return showReviewHome();
   state.rv = { queue, i: 0, ok: 0 };
+  state.rvLast = null;
   show("review");
   renderReview();
 }
@@ -3467,15 +3551,8 @@ function renderReview() {
   const box = $("#review"), rv = state.rv;
   box.innerHTML = "";
   box.append(el("h1", null, "Tekrar"));
-  if (!rv || rv.i >= rv.queue.length) {
-    const n = rv ? rv.queue.length : 0;
-    box.append(el("p", null, n ? `${n} kelimeden ${rv.ok} tanesini hatırladın.` : "Şu an tekrar edilecek kelime yok."),
-      el("p", "hint", "Hatırladıkların daha uzun aralıklarla, hatırlayamadıkların yarın yeniden gelir."));
-    const acts = el("div", "acts");
-    acts.append(actBtn("Deftere dön", () => { show("notebook"); renderNotebook(); }), actBtn("Ana sayfa", () => show("home"), true));
-    const c = el("div", "rvcard"); c.append(acts); box.append(c);
-    return;
-  }
+  if (rv && rv.i >= rv.queue.length) { state.rvLast = { n: rv.queue.length, ok: rv.ok }; state.rv = null; updateBadges(); }
+  if (!state.rv) return renderReviewHome(box);
   const w = state.nb.words[rv.queue[rv.i]];
   if (!w) { rv.i++; return renderReview(); }
   const card = el("div", "rvcard");
@@ -3496,20 +3573,205 @@ function renderReview() {
   card.append(acts);
   box.append(card);
 }
+/* Review home: calendar and the word list */
+const WD_TR = ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"];
+const dayTitle = (s) => new Date(s + "T12:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" });
+// Words looked up on each day, from the taps saved with the texts (both views of an imported section).
+function tapsByDay() {
+  const out = {};
+  state.library.forEach((d) => {
+    const lists = [d.taps || [], ...Object.values(d.views || {}).filter((v) => v && v.taps !== d.taps).map((v) => v.taps || [])];
+    lists.forEach((taps) => taps.forEach((t) => {
+      if (!t || t.known || t.kind === "sentence" || !t.at || !t.lemma) return;
+      const day = dayStr(t.at);
+      (out[day] = out[day] || new Map()).set(norm(t.lemma), t.lemma);
+    }));
+  });
+  return out;
+}
+function renderReviewHome(box) {
+  const tab = state.rvTab || "cal";
+  const tabs = el("div", "row rvtabs");
+  [["cal", "Takvim"], ["words", "Kelimeler"]].forEach(([k, l]) => {
+    const b = el("button", "chip", l);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(tab === k));
+    b.onclick = () => { state.rvTab = k; renderReview(); };
+    tabs.append(b);
+  });
+  box.append(tabs);
+  if (tab === "words") return renderWordsPage(box);
+  const t = today(), due = dueWords();
+  // Today
+  const card = el("div", "rvcard rvtoday");
+  if (state.rvLast) card.append(el("p", "rvdone", `${state.rvLast.n} kelimeden ${state.rvLast.ok} tanesini hatırladın.`));
+  if (due.length) {
+    card.append(el("p", "rvnow", `Bugün ${due.length} kelime tekrar edilecek.`));
+    const acts = el("div", "acts");
+    acts.append(actBtn("Tekrara başla", () => startReview(), true));
+    card.append(acts);
+  } else {
+    card.append(el("p", "rvnow", "Bugün tekrar edilecek kelime yok."));
+    const next = Object.values(state.nb.words).map(dueOf).filter((d) => d > t).sort()[0];
+    if (next) card.append(el("p", "hint", `Sıradaki tekrar ${daysBetween(t, next) === 1 ? "yarın" : dayTitle(next)}: ${Object.values(state.nb.words).filter((w) => dueOf(w) === next).length} kelime.`));
+  }
+  card.append(el("p", "hint", `Yeni baktığın kelimeler ertesi gün gelir; hatırladıkça 1, 3, 7, 16, 35 ve 80 gün arayla, hatırlayamadıkların ertesi gün yeniden. Bir güne en fazla ${RV_CAP} kelime planlanır; dolan günün kelimesi en yakın boş güne geçer.`));
+  box.append(card);
+  // Month
+  const sel = state.calSel || t;
+  const [y, m] = (state.calMonth || t).split("-").map(Number);
+  const marked = tapsByDay();
+  const dueCount = {};
+  Object.values(state.nb.words).forEach((w) => { const d = dueOf(w) < t ? t : dueOf(w); dueCount[d] = (dueCount[d] || 0) + 1; });
+  const doneCount = {};
+  (state.nb.log || []).forEach((e) => { doneCount[e.d] = (doneCount[e.d] || 0) + 1; });
+  const cal = el("div", "cal");
+  const head = el("div", "calhead");
+  const nav = (n, lbl, aria) => { const b = el("button", "calnav", lbl); b.type = "button"; b.setAttribute("aria-label", aria); b.onclick = () => { state.calMonth = dayStr(new Date(y, m - 1 + n, 1).getTime()); renderReview(); }; return b; };
+  head.append(nav(-1, "‹", "Önceki ay"), el("b", null, new Date(y, m - 1, 15).toLocaleDateString("tr-TR", { month: "long", year: "numeric" })), nav(1, "›", "Sonraki ay"));
+  const grid = el("div", "calgrid");
+  WD_TR.forEach((d) => grid.append(el("span", "calwd", d)));
+  const first = new Date(y, m - 1, 1), off = (first.getDay() + 6) % 7, len = new Date(y, m, 0).getDate();
+  for (let i = 0; i < off; i++) grid.append(el("span", "calday out"));
+  for (let n = 1; n <= len; n++) {
+    const d = dayStr(new Date(y, m - 1, n).getTime());
+    const b = el("button", "calday" + (d === t ? " today" : d < t ? " past" : ""));
+    b.type = "button";
+    b.dataset.day = d;
+    b.setAttribute("aria-pressed", String(d === sel));
+    const mk = marked[d] ? marked[d].size : 0;
+    const rv = d < t ? doneCount[d] || 0 : d === t ? due.length + (doneCount[d] || 0) : dueCount[d] || 0;
+    b.append(el("span", "n", String(n)), el("span", "b bm", mk ? "● " + mk : ""), el("span", "b bd", rv ? "↻ " + rv : ""));
+    b.setAttribute("aria-label", `${dayTitle(d)}: ${mk} kelime işaretlendi, ${rv} tekrar`);
+    b.onclick = () => { state.calSel = d; renderReview(); };
+    grid.append(b);
+  }
+  cal.append(head, grid, el("p", "callegend", "● o gün baktığın kelimeler   ↻ tekrar (geçmiş günlerde yaptığın, bugün ve sonrası için planlanan)"));
+  box.append(cal);
+  // Selected day
+  const det = el("section", "caldetail");
+  det.append(el("h2", null, sel === t ? "Bugün, " + dayTitle(sel) : dayTitle(sel)));
+  const nbw = state.nb.words;
+  const listOf = (title, rows) => {
+    if (!rows.length) return;
+    det.append(el("h3", null, `${title} (${rows.length})`));
+    const ul = el("ul", "nblist wlist");
+    rows.forEach(([lemma, meta]) => { const li = el("li", "wrow"); li.append(el("span", "wl", lemma), el("span", "wm", meta)); ul.append(li); });
+    det.append(ul);
+  };
+  const trOf = (k) => (nbw[k] && nbw[k].tr) || "";
+  listOf("Baktığın kelimeler", [...((marked[sel] && marked[sel].entries()) || [])].map(([k, l]) => [l, trOf(k)]));
+  if (sel <= t) {
+    const seen = new Map();
+    (state.nb.log || []).filter((e) => e.d === sel).forEach((e) => seen.set(e.k, e.ok));
+    listOf("Tekrar ettiklerin", [...seen].map(([k, ok]) => [(nbw[k] && nbw[k].lemma) || k, ok ? "✓ hatırladın" : "✗ hatırlayamadın"]));
+  }
+  if (sel >= t) {
+    const ws = sel === t ? due : Object.values(nbw).filter((w) => dueOf(w) === sel);
+    listOf(sel === t ? "Bugün tekrar edilecekler" : "Tekrar edilecekler", ws.map((w) => [w.lemma, [w.tr, STATUS_TR[w.status]].filter(Boolean).join(" · ")]));
+  }
+  if (det.children.length === 1) det.append(el("p", "hint", "Bu gün için kayıt yok."));
+  box.append(det);
+}
+
+/* Word list: every listed word, grouped by what the reader did with it */
+const WG_TR = { mine: "Seçtiklerim", seen: "Görüp seçmediklerim", unseen: "Hiç görmediklerim" };
+// Rows: the main list, the hand-checked opaque words, notebook words, and frequency-list words met in finished texts.
+// "Seen" means met in a finished text (the same rule as the notebook's encounters).
+function wordUniverse() {
+  const seen = new Map();
+  state.library.filter((d) => d.finished).forEach((d) => {
+    (d.paragraphs || []).forEach((p) => splitSentences(p).forEach((s) => {
+      let first = true;
+      for (const m of s.matchAll(WORD_RE)) {
+        const raw = m[0], isFirst = first;
+        first = false;
+        if (/^\d/.test(raw) || (raw[0] !== raw[0].toLowerCase() && !isFirst)) continue;
+        const info = wordInfo(norm(raw));
+        if (!info) continue;
+        if (!seen.has(info.key)) seen.set(info.key, new Set());
+        seen.get(info.key).add(d.id);
+      }
+    }));
+  });
+  const rows = new Map();
+  const add = (k) => { if (rows.has(k)) return; const i = wordInfo(k); rows.set(k, { key: k, lemma: k, l: i ? i.l : 0 }); };
+  LEXMAP.forEach((_, k) => add(k));
+  OPAQUE.forEach((k) => { if (FREQMAP.has(k)) add(k); });
+  seen.forEach((_, k) => add(k));
+  Object.values(state.nb.words).forEach((w) => {
+    if (!rows.has(w.key)) { const i = wordInfo(w.key); rows.set(w.key, { key: w.key, lemma: w.lemma, l: i ? i.l : LV.indexOf(w.cefr) + 1 }); }
+  });
+  rows.forEach((r) => {
+    r.nb = state.nb.words[r.key] || null;
+    r.seen = seen.has(r.key) ? seen.get(r.key).size : 0;
+    r.group = r.nb ? "mine" : r.seen ? "seen" : "unseen";
+  });
+  return [...rows.values()];
+}
+function renderWordsPage(box) {
+  const all = (state.wu = state.wu && state.wu.v === wuVersion() ? state.wu : { v: wuVersion(), rows: wordUniverse() }).rows;
+  const g = state.wuG || "mine", lv = state.wuL || 0;
+  box.append(el("p", "lvl", "Uygulamanın kelime listesi ve senin kelimelerin. “Gördüm” sayılması için kelimenin bitirdiğin bir metinde geçmesi gerekir."));
+  const groups = el("div", "row wgroups");
+  ["mine", "seen", "unseen"].forEach((k) => {
+    const b = el("button", "chip", `${WG_TR[k]} ${all.filter((r) => r.group === k).length.toLocaleString("tr-TR")}`);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(g === k));
+    b.onclick = () => { state.wuG = k; state.wuN = 0; renderReview(); };
+    groups.append(b);
+  });
+  const levels = el("div", "row wlevels");
+  ["Tümü", ...LV].forEach((name, i) => {
+    const b = el("button", "chip small", name);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(lv === i));
+    b.onclick = () => { state.wuL = i; state.wuN = 0; renderReview(); };
+    levels.append(b);
+  });
+  const q = el("input", "nbsearch");
+  q.type = "search"; q.placeholder = "Kelime ara"; q.value = state.wuQ || "";
+  const list = el("ul", "nblist wlist");
+  const more = el("div", "acts");
+  box.append(groups, levels, q, list, more);
+  const draw = () => {
+    const qq = norm(q.value);
+    const rows = all.filter((r) => r.group === g && (!lv || r.l === lv) && (!qq || r.lemma.includes(qq) || (r.nb && norm(r.nb.tr || "").includes(qq))))
+      .sort(g === "seen" ? (a, b) => b.seen - a.seen || a.lemma.localeCompare(b.lemma) : (a, b) => a.lemma.localeCompare(b.lemma));
+    const n = Math.max(150, state.wuN || 0);
+    list.innerHTML = "";
+    more.innerHTML = "";
+    rows.slice(0, n).forEach((r) => {
+      const li = el("li", "wrow");
+      const meta = [r.l ? LV[r.l - 1] : "", r.nb ? [r.nb.tr, STATUS_TR[r.nb.status]].filter(Boolean).join(" · ") : "", r.group === "seen" ? `${r.seen} metinde` : ""].filter(Boolean).join(" · ");
+      li.append(el("span", "wl", r.nb ? r.nb.lemma : r.lemma), el("span", "wm", meta));
+      list.append(li);
+    });
+    if (!rows.length) list.append(el("li", "empty", "Bu grupta kelime yok."));
+    if (rows.length > n) more.append(actBtn(`Daha fazla göster (${(rows.length - n).toLocaleString("tr-TR")} kaldı)`, () => { state.wuN = n + 300; draw(); }));
+  };
+  q.oninput = () => { state.wuQ = q.value; state.wuN = 0; draw(); };
+  draw();
+}
+// The word list is rebuilt only when finished texts or the notebook change.
+const wuVersion = () => state.library.filter((d) => d.finished).length + ":" + Object.keys(state.nb.words).length + ":" + state.library.length;
+
 function answerReview(w, ok) {
-  const r = w.recall || (w.recall = { n: 0, streak: 0, okDates: [], dueAt: 0 });
-  r.n++;
+  const r = w.recall || (w.recall = { n: 0, streak: 0, okDates: [] });
+  r.n = (r.n || 0) + 1;
   r.lastAt = Date.now();
   if (ok) {
     if (!r.okDates.includes(today())) r.okDates.push(today());
-    r.dueAt = Date.now() + INTERVALS[Math.min(r.streak, INTERVALS.length - 1)] * DAY;
-    r.streak++;
+    r.due = planDay(INTERVALS[Math.min(r.streak || 0, INTERVALS.length - 1)], w.key);
+    r.streak = (r.streak || 0) + 1;
     state.rv.ok++;
   } else {
     r.streak = 0;
     r.okDates = [];
-    r.dueAt = Date.now() + DAY;
+    r.due = planDay(1, w.key);
   }
+  // Day-by-day answers, for the calendar.
+  state.nb.log = [...(state.nb.log || []), { d: today(), k: w.key, ok }].slice(-3000);
   w.status = nbStatus(w);
   saveNb();
   state.rv.i++;
@@ -3684,7 +3946,7 @@ function nbProgress(w) {
   const pct = Math.min(1, Math.max(Math.min(enc / 8, texts / 3), Math.min(ok / 2, enc / 3), ok / 3));
   const lines = [];
   if (w.status === "learned") {
-    lines.push(["Öğrenildi.", w.recall && w.recall.dueAt ? ` Bir sonraki kontrol tekrar modunda, ${dueLabel(w)}.` : " Zamanı gelince tekrar modunda kontrol edilecek."]);
+    lines.push(["Öğrenildi.", w.recall && w.recall.due ? ` Bir sonraki kontrol tekrar modunda, ${dueLabel(w)}.` : " Zamanı gelince tekrar modunda kontrol edilecek."]);
     return { pct: 1, lines };
   }
   if (w.status !== "familiar") lines.push(["Tanıdık için:", ` ${Math.max(1, 3 - enc)} karşılaşma daha, ya da tekrarda 1 kez hatırlamak.`]);
@@ -3726,7 +3988,7 @@ function nbItem(w) {
   const acts = el("div", "acts");
   const src = w.docId && byId(w.docId);
   if (src) acts.append(actBtn("Metne git", () => openDoc(src)));
-  if (w.status === "learned" || w.status === "familiar") acts.append(actBtn("Yeniden öğren", () => { w.enc = 0; w.seen = 0; w.guess = false; w.recall = null; w.status = nbStatus(w); saveNb(); renderNotebook(); }));
+  if (w.status === "learned" || w.status === "familiar") acts.append(actBtn("Yeniden öğren", () => { w.enc = 0; w.seen = 0; w.guess = false; w.recall = { n: 0, streak: 0, okDates: [], due: planDay(1, w.key) }; w.status = nbStatus(w); saveNb(); renderNotebook(); }));
   acts.append(actBtn("Sil", (btn) => {
     if (!btn.dataset.sure) { btn.dataset.sure = "1"; btn.textContent = "Emin misin? Sil"; return; }
     delete state.nb.words[w.key]; saveNb(); renderNotebook();

@@ -182,15 +182,47 @@ suite("Akış: defter ve tekrar", (t) => {
     assert(Object.keys(A("state.nb.words")).length >= 1, "word in notebook");
     noScriptErrors();
   });
-  t("Tekrar: göster, hatırladım", async () => {
+  t("yeni kelime bugün değil, yarın tekrar ediliyor", async () => {
+    const w = Object.values(A("state.nb.words"))[0];
+    eq(w.recall.due, A("addDays")(A("today")(), 1), "first review tomorrow");
     click('#tabs button[data-v="review"]');
     await waitFor(() => visible("review"));
-    const show = QA("#review button").find((b) => b.textContent.includes("Anlamını göster"));
-    if (!show) { assert(Q("#review").textContent.includes("tekrar edilecek kelime yok"), "empty state"); return; }
+    assert(Q("#review").textContent.includes("Bugün tekrar edilecek kelime yok"), "nothing today");
+    assert(Q("#review .cal .calday.today"), "calendar shows today");
+    assert(Q("#review .caldetail").textContent.includes(w.lemma), "today's looked-up word listed");
+  });
+  t("Tekrar: takvimden başla, hatırladım, plan ileri kayıyor", async () => {
+    const words = A("state.nb.words"), w = Object.values(words)[0];
+    w.recall.due = A("today")();
+    A("showReviewHome()");
+    const start = await waitFor(() => QA("#review button").find((b) => b.textContent === "Tekrara başla"), "start button");
+    start.click();
+    const show = await waitFor(() => QA("#review button").find((b) => b.textContent.includes("Anlamını göster")));
     show.click();
     const yes = await waitFor(() => QA("#review button").find((b) => b.textContent === "Hatırladım"));
     yes.click();
-    await waitFor(() => Q("#review .rvcard"));
+    await waitFor(() => Q("#review .rvtoday"), "back to the calendar");
+    assert(Q("#review .rvtoday").textContent.includes("tanesini hatırladın"), "result shown");
+    assert(w.recall.due > A("today")(), "next review later");
+    const log = A("state.nb.log");
+    eq(log[log.length - 1].k, w.key); eq(log[log.length - 1].ok, true);
+    const day = Q(`#review .calday[data-day="${A("today")()}"]`);
+    day.click();
+    assert(Q("#review .caldetail").textContent.includes("✓ hatırladın"), "today's answers listed");
+    noScriptErrors();
+  });
+  t("Kelimeler sekmesi: üç grup, seçilen kelime ilk grupta", async () => {
+    QA("#review .rvtabs .chip").find((b) => b.textContent === "Kelimeler").click();
+    await waitFor(() => Q("#review .wgroups"));
+    const g = QA("#review .wgroups .chip").map((b) => b.textContent);
+    assert(g[0].startsWith("Seçtiklerim") && g[1].startsWith("Görüp seçmediklerim") && g[2].startsWith("Hiç görmediklerim"), g.join(" / "));
+    const w = Object.values(A("state.nb.words"))[0];
+    assert(QA("#review .wlist .wl").some((x) => x.textContent === w.lemma), "notebook word in Seçtiklerim");
+    QA("#review .wgroups .chip")[2].click();
+    assert(QA("#review .wlist .wrow").length >= 150, "long list shown in parts");
+    assert(QA("#review .acts button").some((b) => b.textContent.startsWith("Daha fazla göster")), "more button");
+    eq(W.document.documentElement.scrollWidth, W.document.documentElement.clientWidth, "no sideways scroll");
+    QA("#review .rvtabs .chip").find((b) => b.textContent === "Takvim").click();
     noScriptErrors();
   });
 });
