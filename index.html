@@ -4438,8 +4438,9 @@ $("#impPhoto").onchange = async (e) => {
 
 /* =========================================================
    Writing ("Yazılarım"): the reader's own English, checked for mistakes and rewritten fluently,
-   shown side by side. The writer's level is the score of their corrected text; the rewrite aims
-   at that score unless the reader asks for another one.
+   shown side by side. The fluent version is written at the reader's reading level (the level their
+   texts are made at) unless they ask for another score. The writer's own level is not shown: a word-based
+   score says little about writing, where grammar matters most.
    ========================================================= */
 state.writings = [];
 // The unsent draft is kept in this browser, so closing the app does not lose it.
@@ -4467,10 +4468,9 @@ const WCHECK_SCHEMA = {
       type: { type: "string", enum: ["grammar", "spelling", "word", "punctuation"] }, why: { type: "string" },
     }, required: ["p", "wrong", "right", "type", "why"], additionalProperties: false } },
     corrected: { type: "array", items: { type: "string" } },
-    cefr: { type: "string", enum: LV },
     feedback: { type: "string" },
   },
-  required: ["errors", "corrected", "cefr", "feedback"], additionalProperties: false,
+  required: ["errors", "corrected", "feedback"], additionalProperties: false,
 };
 const WREWRITE_SCHEMA = { type: "object", properties: { paragraphs: { type: "array", items: { type: "string" } } }, required: ["paragraphs"], additionalProperties: false };
 // One paragraph per line; blank lines and stray spaces do not matter.
@@ -4493,11 +4493,10 @@ Work like a careful, encouraging English teacher.
    - "why": one short sentence in simple Turkish that explains the rule to a learner
    List every occurrence separately, in the order they appear. If there are no mistakes, give an empty list.
 2. "corrected": the paragraphs with exactly these mistakes fixed and nothing else changed, one string per paragraph, the same number of paragraphs.
-3. "cefr": the writer's level (A1, A2, B1, B2, C1 or C2), judged from the range and accuracy of their grammar and vocabulary.
-4. "feedback": one or two sentences in Turkish, speaking to the writer as "sen": one thing they did well, and the most useful thing to work on.
+3. "feedback": one or two sentences in Turkish, speaking to the writer as "sen": one thing they did well, and the most useful thing to work on.
 
 Reply with only this JSON:
-{"errors": [{"p": 1, "wrong": "...", "right": "...", "type": "grammar", "why": "..."}], "corrected": ["..."], "cefr": "B1", "feedback": "..."}`;
+{"errors": [{"p": 1, "wrong": "...", "right": "...", "type": "grammar", "why": "..."}], "corrected": ["..."], "feedback": "..."}`;
 }
 function writingRewritePrompt(paras, target, own) {
   const v = vocabRule(target, paras.reduce((a, x) => a + wc(x), 0));
@@ -4592,7 +4591,8 @@ async function checkWriting(w, target) {
     const corr = r && Array.isArray(r.corrected) ? r.corrected.map((x) => String(x || "").trim()) : [];
     // The model's corrected text is the base for scoring and rewriting when it lines up with the original.
     const base = corr.length === w.paras.length && corr.every(Boolean) ? corr : fixed;
-    w.check = { errors, fixed, base, cefr: LV.includes(r && r.cefr) ? r.cefr : "", feedback: String((r && r.feedback) || "").trim(), model: TIERS.check.model, at: Date.now() };
+    w.check = { errors, fixed, base, feedback: String((r && r.feedback) || "").trim(), model: TIERS.check.model, at: Date.now() };
+    // Not shown; only tells the rewrite prompt whether the target is far above or below the writer's words.
     w.own = writerScore(base);
     w.status = "writing";
     wRefresh(w);
@@ -4601,7 +4601,7 @@ async function checkWriting(w, target) {
     w.error = errorCopy(e, "Yazı kontrolü");
     return wRefresh(w);
   }
-  await rewriteWriting(w, target == null ? w.own.score : target);
+  await rewriteWriting(w, target == null ? targetScore() : target);
 }
 async function rewriteWriting(w, target) {
   target = Math.max(0, Math.min(100, Number(target) || 0));
@@ -4626,7 +4626,7 @@ async function rewriteWriting(w, target) {
       paras = res.paragraphs;
       m = measure(paras, target, []);
     }
-    w.versions[key] = { target: round(target), paras, score: round(m.score * 10) / 10, first, aligned: paras.length === base.length, at: Date.now() };
+    w.versions[key] = { target: round(target), paras, score: round(m.score * 10) / 10, n: m.n, first, aligned: paras.length === base.length, at: Date.now() };
     w.cur = key;
     w.pending = null;
   } catch (e) {
@@ -4680,7 +4680,7 @@ function renderWriting() {
   num.hidden = dr.mode !== "set";
   num.oninput = () => { dr.target = num.value; saveDraft(); };
   lv.append(
-    chipBtn("Benim seviyemde", dr.mode !== "set", () => { dr.mode = "own"; saveDraft(true); renderWriting(); }),
+    chipBtn(`Okuma seviyemde (${round(targetScore())})`, dr.mode !== "set", () => { dr.mode = "own"; saveDraft(true); renderWriting(); }),
     chipBtn("Belirli bir puanda", dr.mode === "set", () => { dr.mode = "set"; saveDraft(true); renderWriting(); const n = $("#writing .wnum"); if (n) n.focus(); }),
     num,
   );
@@ -4723,7 +4723,7 @@ function renderWritingList() {
       b.type = "button";
       b.append(el("span", "tt", w.title));
       const bits = [new Date(w.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })];
-      if (w.check) bits.push(w.check.errors.length ? `${w.check.errors.length} hata` : "hata yok", `puan ${round(w.own.score)}`);
+      if (w.check) bits.push(w.check.errors.length ? `${w.check.errors.length} hata` : "hata yok");
       else bits.push(w.status === "checking" ? "kontrol ediliyor" : "kontrol edilemedi");
       b.append(el("span", "meta", bits.join(" · ")));
       b.onclick = () => openWriting(w.id);
@@ -4852,7 +4852,7 @@ function renderWritingDoc(w) {
     again.onclick = () => {
       if (!w.check) return checkWriting(w, null);
       const cur = w.versions && w.versions[w.cur];
-      rewriteWriting(w, w.pending != null ? w.pending : cur ? cur.target : w.own.score);
+      rewriteWriting(w, w.pending != null ? w.pending : cur ? cur.target : targetScore());
     };
     n.append(again);
     box.append(n);
@@ -4861,20 +4861,18 @@ function renderWritingDoc(w) {
     box.append(...w.paras.map((x) => el("p", "wp", x)));
     return;
   }
-  const c = w.check, errs = c.errors, own = w.own || { score: 0, n: 0 };
+  const c = w.check, errs = c.errors;
   const sum = el("div", "wsum");
-  sum.append(el("p", "wlevelline", `Senin seviyen: puan ${round(own.score)} (${scoreName(own.score)})${c.cefr ? ` · Claude’un tahmini ${c.cefr}` : ""}`));
   sum.append(el("p", "wcount", errs.length ? `${errs.length} hata bulundu. İşaretli yerlere dokununca açıklaması çıkar.` : "Dil bilgisi ya da yazım hatası bulunmadı."));
-  if (own.n < 40) sum.append(el("p", "hint", "Metin kısa olduğu için puan kaba bir tahmin."));
   if (c.feedback) sum.append(el("p", "wfeed", c.feedback));
   box.append(sum);
 
-  // Level of the fluent version: the writer's own score, earlier targets, or a new number.
+  // Level of the fluent version: the reading level, earlier targets, or a new number.
   const v = w.versions && w.versions[w.cur];
   const lvBox = el("div", "wlevel");
   lvBox.append(el("span", "wlbl", "Akıcı hali:"));
-  const ownKey = wKey(own.score);
-  const ownB = chipBtn(`Benim seviyem (${round(own.score)})`, w.cur === ownKey, () => rewriteWriting(w, own.score));
+  const rl = round(targetScore()), ownKey = wKey(rl);
+  const ownB = chipBtn(`Okuma seviyem (${rl})`, w.cur === ownKey, () => rewriteWriting(w, rl));
   ownB.disabled = busy;
   lvBox.append(ownB);
   Object.keys(w.versions || {}).filter((k) => k !== ownKey).sort((a, b) => a - b).forEach((k) => {
@@ -4894,7 +4892,7 @@ function renderWritingDoc(w) {
   box.append(lvBox);
   if (v) {
     const off = Math.abs(v.score - v.target) > 4;
-    box.append(el("p", "hint wvline", `Akıcı halin puanı ${round(v.score)} (${scoreName(v.score)}), hedef ${v.target}.` + (off ? (own.n < 25 ? " Kısa metinde puan hedeften sapabilir." : " Hedefe tam oturtulamadı.") : "")));
+    box.append(el("p", "hint wvline", `Akıcı halin puanı ${round(v.score)} (${scoreName(v.score)}), hedef ${v.target}.` + (off ? (v.n != null && v.n < 60 ? " Kısa metinde puan hedeften sapabilir." : " Hedefe tam oturtulamadı.") : "")));
   }
 
   // Side by side: the writer's text with its mistakes marked | the fluent version (or only the corrections).

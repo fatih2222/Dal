@@ -483,7 +483,8 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     const ck = callsOf("wcheck")[0], rw = callsOf("wrewrite")[0];
     eq(ck.model, "claude-sonnet-5-5"); eq(rw.model, "claude-haiku-5-5"); assert(ck.schema && rw.schema, "both with a schema");
     assert(rw.prompt.includes("I went to the market"), "rewrite starts from the corrected text");
-    eq(w.cur, String(Math.round(w.own.score)), "rewrite at the writer's own level");
+    eq(w.cur, String(Math.round(A("targetScore()"))), "rewrite at the reading level");
+    assert(!Q("#writedoc .wsum").textContent.includes("seviyen"), "no writer level shown");
     QA("#writedoc .werr")[2].click();
     assert(Q("#writedoc .wtip.inrow") && Q("#writedoc .wtip.inrow").textContent.includes("information"), "explanation opens");
     QA("#writedoc .werr")[2].click();
@@ -524,7 +525,7 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     eq(A("state.writings[0].cur"), "70");
     assert(QA("#writedoc .wlevel .chip").some((b) => b.textContent === "70" && b.getAttribute("aria-pressed") === "true"), "version chip");
     NET.calls = [];
-    QA("#writedoc .wlevel .chip").find((b) => b.textContent.startsWith("Benim seviyem")).click();
+    QA("#writedoc .wlevel .chip").find((b) => b.textContent.startsWith("Okuma seviyem")).click();
     await wait(200);
     eq(NET.calls.length, 0, "earlier version reused");
     click('#tabs button[data-v="writing"]');
@@ -571,7 +572,7 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     eq(Q("#wText").value, "This is my unfinished draft about the weekend.", "draft back");
     assert(!Q("#writing .wnum").hidden, "chosen level mode back");
     Q("#wText").value = ""; Q("#wText").dispatchEvent(new W.Event("input"));
-    QA("#writing .wlevel .chip").find((b) => b.textContent === "Benim seviyemde").click();
+    QA("#writing .wlevel .chip").find((b) => b.textContent.startsWith("Okuma seviyemde")).click();
     await wait(500);
     noScriptErrors();
   });
