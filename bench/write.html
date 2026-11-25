@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dal yazı kontrolü ölçümü</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; color: #222; background: #fafafa; }
+  table { border-collapse: collapse; margin: 8px 0 16px; }
+  td, th { border: 1px solid #ccc; padding: 3px 8px; text-align: right; vertical-align: top; }
+  th:first-child, td:first-child { text-align: left; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  iframe { width: 10px; height: 10px; border: 0; position: fixed; right: 0; bottom: 0; }
+  .miss { color: #b00; } .fp { color: #a60; }
+</style>
+</head>
+<body>
+<h1>Yazı kontrolü: model karşılaştırması</h1>
+<p>Elle yazılmış 12 öğrenci metni (Türk öğrencilere özgü hatalarla; 2 tanesi hatasız). Her hata için kabul edilen düzeltmeler aşağıda.
+<b>Gerçek API kullanır</b>: anahtar, yerel uygulamada (http://localhost:8765/) Ayarlar'a girilmiş olmalı. Başlatmak için düğmeye bas.</p>
+<button id="go" disabled>Başlat</button>
+<div id="status">Uygulama yükleniyor…</div>
+<div id="out"></div>
+<iframe id="app" src="../index.html"></iframe>
+<script>
+"use strict";
+const WB = { done: false, started: false };
+window.__WB = WB;
+
+// Gold set. Each mistake: the words as written (occurrence k in its paragraph), and corrections that count as fixed
+// (any of them found, case-insensitive, in the corrected paragraph).
+const SET = [
+  { id: "antalya", text: "Last summer ı went to Antalya with my family. We stayed in a hotel near to the sea. The weather was very hot and we swimmed every day.\n\nMy brother don't like the sea, so he was playing games in the room. I think it was a amazing holiday.",
+    gold: [[1, "ı", ["summer I went"]], [1, "near to the sea", ["near the sea"]], [1, "swimmed", ["swam"]], [2, "don't like", ["doesn't like", "didn't like", "does not like", "did not like"]], [2, "a amazing", ["an amazing"]]] },
+  { id: "uniform", text: "I am agree with the idea that students should wear uniforms. Because uniforms make everyone equal. In my school, everybody were wearing same clothes and nobody was feeling bad about their clothes.",
+    gold: [[1, "I am agree", ["I agree"]], [1, ". Because", ["uniforms, because", "uniforms because", "This is because", "uniforms. This"]], [1, "everybody were", ["everybody was", "everyone was"]], [1, "same clothes", ["the same clothes"]]] },
+  { id: "email", text: "Dear Mr. Brown,\n\nI am writing to inform you that I will not be able to attend to the meeting on Monday. I have an appointment with my doctor since two weeks and I can't change it.\n\nCould you please send me the informations about the meeting? I would be very happy if you can share the notes.\n\nBest regards,\n\nAyşe",
+    gold: [[2, "attend to the meeting", ["attend the meeting"]], [2, "since two weeks", ["two weeks ago", "for two weeks", "for the past two weeks"]], [3, "informations", ["the information", " information about"]], [3, "if you can share", ["if you could share"]]] },
+  { id: "village", text: "When I was child, I lived in a small village. Every morning I was waking up early and helping my grandmother in the garden. She was teaching me how to grow tomatoes. I miss those days so much, because life was more simple and people was more friendly.",
+    gold: [[1, "was child", ["was a child"]], [1, "was waking up", ["woke up", "would wake up", "used to wake up"]], [1, "more simple", ["simpler"]], [1, "people was", ["people were"]]] },
+  { id: "social-clean", text: "Many people think that social media brings people together. It is true that we can talk to friends who live far away. However, I believe it also makes us lonely, because we spend hours looking at our phones instead of meeting each other. In my opinion, we should use it less and spend more time with the people around us.",
+    gold: [] },
+  { id: "ai", text: "Nowadays, artificial intelligence is used in almost every area of our life. Although it has many advantages, there are also some risks which we should be careful. For example, many people may lose their jobs, and the governments are not ready for this situation. Moreover, AI systems sometimes gives wrong informations, but they sound very confident. That's why I think we need clear rules before it is too late.",
+    gold: [[1, "should be careful", ["careful about", "careful of", "aware of", "careful with"]], [1, "the governments", ["and governments"]], [1, "gives", ["systems sometimes give", "systems give", "sometimes give"]], [1, "wrong informations", ["wrong information", "incorrect information"]]] },
+  { id: "novel", text: "The novel tells the story of a young woman who moves to Istanbul to study medicine. In the beginning she feels lonely, but slowly she makes friends and discover the city. I especially liked the descriptions of the old neighbourhoods; they made me feel like I was walking there myself. The only problem is that the ending is a bit rushed. Despite of this, I would recommend it to anyone who enjoys stories about growing up.",
+    gold: [[1, "discover", ["discovers"]], [1, "Despite of this", ["Despite this", "In spite of this"]]] },
+  { id: "course-clean", text: "Had I known how demanding the course would be, I might have planned my schedule differently. That said, the workload, however exhausting, forced me to become far more disciplined than I had ever been. The data we collected were, admittedly, messier than expected, yet they revealed a pattern that none of us had anticipated. Looking back, I would not trade the experience for anything.",
+    gold: [] },
+  { id: "short", text: "ı did it but ı did not like it.",
+    gold: [[1, "ı", ["I did it"]], [1, "ı", ["but I did"]]] },
+  { id: "routine", text: "I usualy wake up at seven o'clock. After breakfast I take the bus to my office. The trafic is terrible in the mornings, so I listen podcasts to learn english. In the evening I cook dinner and watch a film with my wife.",
+    gold: [[1, "usualy", ["usually"]], [1, "trafic", ["traffic"]], [1, "listen podcasts", ["listen to podcasts"]], [1, "english", ["learn English"]]] },
+  { id: "university", text: "I strongly believe that university education should be free for everyone. Unfortunately, in many countries students have to make a big debt to study. This situation prevents talented young people to reach their potential. If the education was free, more people would be able to improve themselves and contribute the economy.",
+    gold: [[1, "make a big debt", ["into debt", "take on", "into big debt", "borrow", "a lot of debt", "huge debt", "large debt", "big debt"]], [1, "to reach", ["from reaching"]], [1, "If the education", ["If education", "If university education"]], [1, "contribute the economy", ["contribute to the economy"]]] },
+  { id: "station", text: "Yesterday I have seen an old friend at the station. We didn't met for ten years, so we were very surprised. He told me that he is living in Germany now and works as an engineer. We drunk coffee together and talked about our school days.",
+    gold: [[1, "I have seen", ["I saw"]], [1, "didn't met", ["hadn't met", "had not met", "hadn't seen", "had not seen"]], [1, "We drunk", ["We drank", "We had"]]] },
+];
+const CONFIGS = [
+  { name: "Haiku 5.5, low", tier: { model: "claude-haiku-5-5", effort: "low", fallback: false } },
+  { name: "Haiku 5.5, medium", tier: { model: "claude-haiku-5-5", effort: "medium", fallback: false } },
+  { name: "Sonnet 5.5, low", tier: { model: "claude-sonnet-5-5", effort: "low", fallback: true } },
+];
+const PRICE = { "claude-haiku-5-5": [0.1, 0.5], "claude-sonnet-5-5": [2, 10] }; // $ per million tokens, in / out
+const REWRITE_EXTRA = [["ai", 70], ["routine", 70], ["novel", 30]];
+
+let W;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+const say = (t) => { $("#status").textContent = t; };
+
+// Gold spans in the original paragraphs: the k-th occurrence for repeated words.
+function goldSpans(item, paras) {
+  const seen = {};
+  return item.gold.map(([p, wrong, fixes]) => {
+    const i = p - 1, key = i + "|" + wrong;
+    let at = -1, from = 0;
+    for (let k = 0; k <= (seen[key] || 0); k++) { at = paras[i].indexOf(wrong, from); from = at + 1; }
+    seen[key] = (seen[key] || 0) + 1;
+    if (at < 0) throw new Error("gold not found: " + item.id + " " + wrong);
+    return { i, at, end: at + wrong.length, wrong, fixes };
+  });
+}
+async function pool(items, n, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: n }, async () => { while (next < items.length) { const k = next++; out[k] = await fn(items[k], k); } }));
+  return out;
+}
+function usageCost(before, after) {
+  let c = 0;
+  Object.keys(after).forEach((m) => {
+    const a = after[m], b = before[m] || { in: 0, out: 0, calls: 0 };
+    const p = PRICE[m] || [0, 0];
+    c += ((a.in - b.in) * p[0] + (a.out - b.out) * p[1]) / 1e6;
+  });
+  return c;
+}
+const snap = () => JSON.parse(JSON.stringify(W.eval("apiUsage")));
+
+async function runCheck(cfg) {
+  W.eval("TIERS").check = cfg.tier;
+  const u0 = snap();
+  const rows = await pool(SET, 3, async (item) => {
+    const paras = W.eval("writingParas")(item.text);
+    const t0 = performance.now();
+    let r, err = "";
+    try { r = await W.eval("state").sample.json(W.writingCheckPrompt(paras), { modelTier: "check", schema: W.eval("WCHECK_SCHEMA"), cache: false }); }
+    catch (e) { err = (e && e.code) || String(e); }
+    const ms = performance.now() - t0;
+    if (!r) return { item, err, ms, found: 0, fixed: 0, fps: [], misses: item.gold.map((g) => g[1]) };
+    const errs = W.locateErrors(paras, r.errors);
+    const fixedParas = W.applyErrors(paras, errs);
+    const corr = Array.isArray(r.corrected) && r.corrected.length === paras.length ? r.corrected : fixedParas;
+    const gold = goldSpans(item, paras);
+    let found = 0, fixed = 0;
+    const misses = [];
+    gold.forEach((g) => {
+      const hit = errs.some((e) => e.p === g.i && e.at >= 0 && e.at < g.end && e.at + e.wrong.length > g.at);
+      const ok = g.fixes.some((f) => corr[g.i].toLowerCase().includes(f.toLowerCase()));
+      if (hit) found++;
+      if (hit && ok) fixed++;
+      if (!hit || !ok) misses.push(`${g.wrong}${hit ? " (işaretlendi, düzeltme farklı)" : ""}`);
+    });
+    const fps = errs.filter((e) => !gold.some((g) => e.p === g.i && e.at >= 0 && e.at < g.end && e.at + e.wrong.length > g.at))
+      .map((e) => `${e.wrong} → ${e.right} [${e.at < 0 ? "metinde yok" : e.type}] ${e.why}`);
+    return { item, ms, found, fixed, fps, misses, cefr: r.cefr, feedback: r.feedback, corr, base: corr };
+  });
+  const cost = usageCost(u0, snap());
+  return { cfg, rows, cost };
+}
+async function runRewrites(base) {
+  const u0 = snap();
+  const jobs = [];
+  base.rows.forEach((row) => { if (row.corr) jobs.push({ row, target: W.writerScore(row.corr).score, own: true }); });
+  REWRITE_EXTRA.forEach(([id, t]) => { const row = base.rows.find((r) => r.item.id === id); if (row && row.corr) jobs.push({ row, target: t, own: false }); });
+  const out = await pool(jobs, 3, async (j) => {
+    const t0 = performance.now();
+    try {
+      const r = await W.eval("state").sample.json(W.writingRewritePrompt(j.row.corr, j.target, W.writerScore(j.row.corr).score), { modelTier: "default", schema: W.eval("WREWRITE_SCHEMA"), cache: false });
+      let paras = r.paragraphs.map((x) => String(x).replace(/\s+/g, " ").trim()).filter(Boolean);
+      let m = W.measure(paras, j.target, []);
+      const first = m.score;
+      if (Math.abs(m.score - j.target) > 4 && m.n >= 25) {
+        const res = await W.reviseToTarget("", paras, j.target, [], m, null, "Akıcı hali", () => {});
+        paras = res.paragraphs; m = W.measure(paras, j.target, []);
+      }
+      return { ...j, paras, first, score: m.score, n: m.n, aligned: paras.length === j.row.corr.length, ms: performance.now() - t0 };
+    } catch (e) { return { ...j, err: (e && e.code) || String(e), ms: performance.now() - t0 }; }
+  });
+  return { jobs: out, cost: usageCost(u0, snap()) };
+}
+function report(results, rw) {
+  const goldN = SET.reduce((a, s) => a + s.gold.length, 0);
+  let h = `<h2>Hata bulma (${goldN} hata, ${SET.length} metin)</h2><table><tr><th>Model</th><th>Bulunan</th><th>Doğru düzeltilen</th><th>Fazladan işaret</th><th>Hatasız metinlerde işaret</th><th>Ort. süre</th><th>Maliyet (12 metin)</th></tr>`;
+  results.forEach((r) => {
+    const f = r.rows.reduce((a, x) => a + x.found, 0), x = r.rows.reduce((a, y) => a + y.fixed, 0), fp = r.rows.reduce((a, y) => a + y.fps.length, 0);
+    const clean = r.rows.filter((y) => !y.item.gold.length).reduce((a, y) => a + y.fps.length, 0);
+    const ms = r.rows.reduce((a, y) => a + y.ms, 0) / r.rows.length;
+    h += `<tr><td>${r.cfg.name}</td><td>${f}/${goldN}</td><td>${x}/${goldN}</td><td>${fp}</td><td>${clean}</td><td>${(ms / 1000).toFixed(1)} sn</td><td>$${r.cost.toFixed(4)}</td></tr>`;
+  });
+  h += "</table>";
+  results.forEach((r) => {
+    h += `<h3>${r.cfg.name}</h3>`;
+    r.rows.forEach((y) => {
+      h += `<div><b>${y.item.id}</b> ${y.err ? `<span class="miss">HATA ${esc(y.err)}</span>` : ""} CEFR ${y.cefr || "-"} · ${(y.ms / 1000).toFixed(1)} sn`;
+      if (y.misses.length) h += `<div class="miss">Kaçan/yanlış düzeltilen: ${y.misses.map(esc).join(" · ")}</div>`;
+      if (y.fps.length) h += `<div class="fp">Fazladan: ${y.fps.map(esc).join("<br>")}</div>`;
+      h += `<div>Geri bildirim: ${esc(y.feedback || "")}</div></div>`;
+    });
+  });
+  if (rw) {
+    h += `<h2>Akıcı hali (Haiku 5.5) — maliyet $${rw.cost.toFixed(4)}</h2><table><tr><th>Metin</th><th>Hedef</th><th>İlk puan</th><th>Son puan</th><th>Kelime</th><th>Paragraf eşleşti</th><th>Süre</th></tr>`;
+    rw.jobs.forEach((j) => { h += `<tr><td>${j.row.item.id}${j.own ? "" : " (istenen)"}</td><td>${j.target.toFixed(1)}</td><td>${j.err ? esc(j.err) : j.first.toFixed(1)}</td><td>${j.err ? "" : j.score.toFixed(1)}</td><td>${j.n || ""}</td><td>${j.aligned ? "evet" : "hayır"}</td><td>${(j.ms / 1000).toFixed(1)} sn</td></tr>`; });
+    h += "</table>";
+    rw.jobs.forEach((j) => { if (!j.err) h += `<h4>${j.row.item.id} → hedef ${j.target.toFixed(0)}</h4><pre>${esc(j.row.corr.join("\n\n"))}</pre><pre style="color:#064">${esc(j.paras.join("\n\n"))}</pre>`; });
+  }
+  $("#out").innerHTML = h;
+}
+async function start() {
+  if (WB.started) return;
+  WB.started = true;
+  $("#go").disabled = true;
+  const results = [];
+  for (const cfg of CONFIGS) { say(`Ölçülüyor: ${cfg.name}…`); results.push(await runCheck(cfg)); report(results); }
+  say("Akıcı hali yazılıyor (Haiku)…");
+  const base = results[results.length - 1];
+  const rw = await runRewrites(base);
+  report(results, rw);
+  W.eval("TIERS").check = CONFIGS[0].tier;
+  WB.results = results.map((r) => ({ name: r.cfg.name, cost: r.cost, rows: r.rows.map((y) => ({ id: y.item.id, found: y.found, fixed: y.fixed, fps: y.fps, misses: y.misses, ms: Math.round(y.ms), err: y.err })) }));
+  WB.rewrites = rw.jobs.map((j) => ({ id: j.row.item.id, target: j.target, first: j.first, score: j.score, n: j.n, aligned: j.aligned, err: j.err, paras: j.paras, ms: Math.round(j.ms) }));
+  WB.rwCost = rw.cost;
+  WB.done = true;
+  say("Bitti.");
+}
+$("#app").addEventListener("load", async () => {
+  W = $("#app").contentWindow;
+  for (let i = 0; i < 100 && !(W.eval("typeof state !== \"undefined\"") && W.writingCheckPrompt); i++) await new Promise((r) => setTimeout(r, 100));
+  // Sanity check of the gold set against the texts (no API needed).
+  try { SET.forEach((s) => goldSpans(s, W.eval("writingParas")(s.text))); } catch (e) { say("Altın set hatalı: " + e.message); return; }
+  if (!W.eval("state").sample) { say("API anahtarı yok: yerel uygulamada (http://localhost:8765/) Ayarlar'dan gir, sonra bu sayfayı yenile."); return; }
+  say("Hazır. Başlatmak için düğmeye bas.");
+  WB.ready = true;
+  $("#go").disabled = false;
+});
+$("#go").onclick = start;
+</script>
+</body>
+</html>

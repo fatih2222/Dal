@@ -605,6 +605,43 @@ article h1{margin-top:.3rem}
 .cwarn{margin-top:.8rem}
 .toast{position:fixed;left:50%;bottom:calc(5.2rem + env(safe-area-inset-bottom,0px));transform:translate(-50%,1rem);background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:999px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:40;white-space:nowrap}
 .toast.on{opacity:1;transform:translate(-50%,0)}
+.wtext{min-height:10rem}
+.wtitle{font-size:1.35rem;margin:0 0 .2rem}
+.wlevel{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:.6rem 0}
+.wlbl{color:var(--muted);font-size:.92rem;margin-right:.2rem}
+.wnum{width:5.2rem;font:inherit;padding:.35rem .6rem;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink)}
+.wnum:focus{border-color:var(--accent);outline:none}
+#writing .acts button,#writedoc .acts button{padding:.55rem 1rem;font:inherit;color:var(--ink)}
+#writing .acts button.main,#writedoc .acts button.main{color:var(--accent-ink)}
+.wh2{font-size:1.05rem;margin:1.6rem 0 .5rem}
+.wlist,.werrs{list-style:none;margin:0;padding:0}
+.wlist li+li,.werrs li+li{border-top:1px solid var(--line)}
+.wrowbtn{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem;width:100%;text-align:left;background:none;border:0;padding:.7rem .1rem;cursor:pointer;color:var(--ink);font:inherit}
+.wrowbtn .tt{font-weight:700}
+.wrowbtn .meta{color:var(--muted);font-size:.85rem}
+.wsum{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:.8rem 1rem;margin:.4rem 0 .6rem}
+.wsum p{margin:.2rem 0}
+.wlevelline{font-weight:700}
+.wfeed{font-style:italic}
+.wprog{margin:.4rem 0 .8rem}
+.wvline{margin:0 0 .6rem}
+.wseg{gap:.4rem;margin:.4rem 0 .6rem;flex-wrap:wrap}
+.wgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.2rem .7rem;margin:.4rem 0 1rem}
+.wcol-h{font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding-bottom:.2rem;border-bottom:1px solid var(--line)}
+.wcell{min-width:0;overflow-wrap:anywhere}
+.wcell .wp{font-family:Literata,Georgia,serif;font-size:.95rem;line-height:1.6;margin:.5rem 0}
+.wr .wp{color:var(--ink)}
+.wl{border-right:1px solid var(--line);padding-right:.6rem;margin-right:-.35rem}
+.wp{font-family:Literata,Georgia,serif;line-height:1.6}
+.werr{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-decoration:underline wavy var(--danger);text-decoration-thickness:1.5px;text-underline-offset:3px;border-radius:4px}
+.werr.on{background:color-mix(in srgb,var(--danger) 16%,transparent)}
+.wfix{background:color-mix(in srgb,var(--accent) 18%,transparent);color:inherit;border-radius:4px;padding:0 .1em}
+.wtip{padding:.55rem .1rem}
+.wtip.inrow{grid-column:1/-1;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:.55rem .8rem;margin:.1rem 0 .4rem}
+.wtiptop{display:flex;flex-wrap:wrap;align-items:baseline;gap:.3rem}
+.wtiptop s{color:var(--danger)}
+.wtype{margin-left:auto;font-size:.78rem;color:var(--muted)}
+.wtip p{margin:.25rem 0 0;font-size:.92rem}
 @media (prefers-reduced-motion: reduce){.in-push,.in-pop,.in-fade,.flip.turn-out .face,.flip.turn-in .face{animation:none}.setpanel,.setback,.appbar{transition:none}}
 </style>
 </head>
@@ -687,6 +724,10 @@ article h1{margin-top:.3rem}
   </section>
 
   <section id="importdoc" hidden></section>
+
+  <section id="writing" hidden></section>
+
+  <section id="writedoc" hidden></section>
 </main>
 
 
@@ -696,6 +737,7 @@ article h1{margin-top:.3rem}
   <button type="button" data-v="trees"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M6 12h10"/></svg><span>Ağaçlar</span></button>
   <button type="button" data-v="notebook"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span>Defter</span><span class="badge" id="nbCount"></span></button>
   <button type="button" data-v="review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg><span>Tekrar</span><span class="badge" id="rvCount"></span></button>
+  <button type="button" data-v="writing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><span>Yazılarım</span></button>
 </nav>
 
 <div class="sheet" id="sheet" aria-live="polite">
@@ -1119,6 +1161,9 @@ const TIERS = {
   // Reading scanned pages and photos stays on Sonnet: a misread page spoils the whole text.
   vision: { model: "claude-sonnet-5-5", effort: "medium", fallback: true },
   quick: { model: "claude-haiku-5-5", effort: "low", fallback: false },
+  // Checking the reader's own writing: on 12 learner texts (36 known mistakes, bench/write.html) Sonnet found all of them,
+  // Haiku 34 and missed article and tense errors; Sonnet was no slower and costs under 1 cent per text.
+  check: { model: "claude-sonnet-5-5", effort: "low", fallback: true },
 };
 const blobToB64 = (b) => new Promise((res, rej) => {
   const r = new FileReader();
@@ -1126,6 +1171,8 @@ const blobToB64 = (b) => new Promise((res, rej) => {
   r.onerror = () => rej(r.error);
   r.readAsDataURL(b);
 });
+// Tokens used in this session per model (for cost checks; not saved).
+const apiUsage = {};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function makeSample() {
   async function once(body, headers, opts) {
@@ -1146,6 +1193,8 @@ function makeSample() {
     // Server-sent events: collect the text blocks; thinking blocks are ignored.
     const reader = res.body.getReader(), dec = new TextDecoder();
     let buf = "", text = "", stop = null;
+    const use = apiUsage[body.model] = apiUsage[body.model] || { calls: 0, in: 0, out: 0 };
+    use.calls++;
     try {
       for (;;) {
         const { value, done } = await reader.read();
@@ -1159,6 +1208,8 @@ function makeSample() {
           if (!line) continue;
           let ev;
           try { ev = JSON.parse(line.slice(5).trim()); } catch (e) { continue; }
+          if (ev.type === "message_start" && ev.message && ev.message.usage) use.in += (ev.message.usage.input_tokens || 0) + (ev.message.usage.cache_read_input_tokens || 0) + (ev.message.usage.cache_creation_input_tokens || 0);
+          if (ev.type === "message_delta" && ev.usage) use.out += ev.usage.output_tokens || 0;
           if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
             text += ev.delta.text;
             if (opts.onText) { try { opts.onText({ text }); } catch (e) {} }
@@ -1507,6 +1558,8 @@ async function loadAll() {
     state.library = all.filter((d) => d.kind === "text").sort((a, b) => b.createdAt - a.createdAt);
     state.library.forEach((d) => { if (!d.finished && d.readPct > 95) d.readPct = 95; });
     state.imports = all.filter((d) => d.kind === "import").sort((a, b) => b.createdAt - a.createdAt);
+    state.writings = all.filter((d) => d.kind === "writing").sort((a, b) => b.createdAt - a.createdAt);
+    state.writings.forEach((w) => { if (w.status === "checking" || w.status === "writing") w.status = w.check ? "done" : "failed"; });
     rescoreHistory();
     const nb = all.find((d) => d.kind === "notebook");
     if (nb && nb.words) { state.nb = nb; nbUpgrade(); }
@@ -1810,7 +1863,7 @@ async function deleteDocs(ids) {
    guard in place. Nothing ever jumps several history steps, so back can never leave the app by
    accident. On Oku with nothing open, the first back shows a hint and the second one leaves the app.
    ========================================================= */
-const ROOTS = ["home", "library", "trees", "notebook", "review"];
+const ROOTS = ["home", "library", "trees", "notebook", "review", "writing"];
 const nav = { stack: [], restoring: false, armed: false };
 const haptic = (ms = 8) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} };
 const curView = () => document.body.dataset.view || "home";
@@ -1820,6 +1873,8 @@ function restoreFor(view) {
   if (view === "importdoc") { const id = state.curImport; return () => showImport(id); }
   if (view === "notebook") return () => { show("notebook"); renderNotebook(); };
   if (view === "review") return () => showReviewHome();
+  if (view === "writing") return () => showWriting();
+  if (view === "writedoc") { const id = state.curWriting; return () => openWriting(id); }
   if (view === "placement") return () => { state.pt = null; show("placement"); renderPlacement(); };
   if (view === "loading") return () => show("home");
   return () => show(view);
@@ -1876,7 +1931,7 @@ function toast(msg) {
   toast.t = setTimeout(() => t.classList.remove("on"), 2200);
 }
 
-const VIEW_TITLES = { library: "Kitaplık", trees: "Ağaçlar", notebook: "Defter", review: "Tekrar", tree: "Okuma ağacı", importv: "Kendi metnin", placement: "Seviye testi", loading: "Hazırlanıyor" };
+const VIEW_TITLES = { library: "Kitaplık", trees: "Ağaçlar", notebook: "Defter", review: "Tekrar", writing: "Yazılarım", tree: "Okuma ağacı", importv: "Kendi metnin", placement: "Seviye testi", loading: "Hazırlanıyor" };
 const AB_ICON = {
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   tree: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M6 12h10"/></svg>',
@@ -1906,6 +1961,9 @@ function setAppbar(view) {
   } else if (view === "importdoc") {
     const imp = state.imports.find((x) => x.id === state.curImport);
     title.textContent = imp ? imp.title : "Belge";
+  } else if (view === "writedoc") {
+    const w = state.writings.find((x) => x.id === state.curWriting);
+    title.textContent = w ? w.title : "Yazı";
   } else if (view === "tree") {
     const r = byId(state.treeRoot);
     title.textContent = r ? r.title : VIEW_TITLES.tree;
@@ -1917,10 +1975,10 @@ $("#abBack").onclick = () => goBack();
 
 function show(view) {
   const how = navRecord(view);
-  ["home", "loading", "reader", "tree", "trees", "library", "notebook", "review", "importv", "importdoc", "placement"].forEach((v) => ($("#" + v).hidden = v !== view));
+  ["home", "loading", "reader", "tree", "trees", "library", "notebook", "review", "importv", "importdoc", "placement", "writing", "writedoc"].forEach((v) => ($("#" + v).hidden = v !== view));
   document.body.dataset.view = view;
   const tab = view === "reader" && state.doc && state.doc.importId ? "library"
-    : { home: "home", loading: "home", reader: "home", tree: "trees", trees: "trees", library: "library", notebook: "notebook", review: "review", importv: "home", importdoc: "library", placement: "home" }[view];
+    : { home: "home", loading: "home", reader: "home", tree: "trees", trees: "trees", library: "library", notebook: "notebook", review: "review", importv: "home", importdoc: "library", placement: "home", writing: "writing", writedoc: "writing" }[view];
   document.querySelectorAll("#tabs button").forEach((b) => { if (b.dataset.v === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   $("#tabs").classList.remove("away");
   $("#appbar").classList.remove("away");
@@ -1941,6 +1999,7 @@ function openTab(v) {
   else if (v === "trees") show("trees");
   else if (v === "library") show("library");
   else if (v === "notebook") { show("notebook"); renderNotebook(); }
+  else if (v === "writing") showWriting();
   else showReviewHome();
 }
 function goTab(v) { closeOverlays(); openTab(v); }
@@ -2063,7 +2122,7 @@ function bandPool(l, max, exclude) {
   return [...shuffled(awl), ...shuffled(other)].slice(0, max);
 }
 const LEN = { short: "180 to 250 words, 2 to 3 paragraphs", normal: "380 to 480 words, 4 to 6 paragraphs", long: "700 to 850 words, 6 to 9 paragraphs" };
-function vocabRule(target) {
+function vocabRule(target, nWords) {
   const l = Math.max(2, bandOf(target));
   const f = Math.min(0.99, Math.max(0, (target - BOUND[l - 1]) / (BOUND[l] - BOUND[l - 1])));
   const L = LV[l - 1], P = LV[l - 2], N = LV[l] || "C2";
@@ -2079,13 +2138,14 @@ function vocabRule(target) {
     if (awl.length < 60) LEXMAP.forEach((v, w) => { if (v >= l + 2 && !AWLSET.has(w)) other.push(w); });
     return [...shuffle(awl), ...shuffle(other)].slice(0, 120);
   })();
-  const nEst = Math.round((LEN_WORDS[state.settings.len] || LEN_WORDS.normal) * 0.88);
+  const nEst = Math.round((nWords || LEN_WORDS[state.settings.len] || LEN_WORDS.normal) * 0.88);
   const aCount = Math.max(2, Math.round(nEst * a / 100));
   const plan = bandPlan(target, nEst, aCount);
   const lPool = l >= 4 ? bandPool(l, 150) : [];
   const counts = ` In numbers: the text needs about ${plan.need} ${L}-level words in total (repeats count) and about ${aCount} words above ${L}; the rest at ${P} level or below.` + (l >= 4 ? ` Writers usually end up far below this ${L} count, so use precise ${L}-level words wherever a plainer word would otherwise appear.` : "") +
     (lPool.length ? ` Take the ${L}-level words from this list wherever they fit naturally (inflected forms are fine): ${lPool.join(", ")}.` : "");
-  const far = F ? ` Most of these should be ${N}-level target words, preferably from the Academic Word List. Also include 2 to 4 ${F}-level words whose meaning the reader can guess from the surrounding context (extensive-reading style); choose them from this list, wherever they fit naturally (inflected forms are fine): ${pool.join(", ")}.` : "";
+  // A short text of the reader's own stays without the extensive-reading words.
+  const far = F && !(nWords && nWords < 150) ? ` Most of these should be ${N}-level target words, preferably from the Academic Word List. Also include 2 to 4 ${F}-level words whose meaning the reader can guess from the surrounding context (extensive-reading style); choose them from this list, wherever they fit naturally (inflected forms are fine): ${pool.join(", ")}.` : "";
   return { L, N, text: `Vocabulary balance (very important): about ${round(below)}% of the words should be at ${P} level or below (everyday words), about ${round(s)}% at ${L} level, and only about ${round(a)}% above ${L}.${counts}${far} Spread the harder words evenly through the text; never cluster them. Avoid very rare or archaic words that appear in no learner word list.` };
 }
 // Sentence complexity follows the target: the level widens the range of structures used, it never removes simple sentences.
@@ -2258,14 +2318,15 @@ const SWAPS_SCHEMA = { type: "object", properties: { swaps: { type: "array", ite
 const OK_SCHEMA = { type: "object", properties: { ok: { type: "array", items: { type: "integer" } } }, required: ["ok"], additionalProperties: false };
 // Brings a text closer to its target score: the model proposes word swaps, a second call checks them for
 // naturalness, and the app applies the approved ones while measuring. Up to two rounds; the closest version wins.
-async function reviseToTarget(title, paragraphs, target, terms, m1, signal, what) {
+async function reviseToTarget(title, paragraphs, target, terms, m1, signal, what, say) {
+  const tell = say || ((t) => { $("#loadProg").textContent = t; });
   const revised = { reason: m1.score > target ? "hard" : "easy", accepted: false, rounds: [] };
   const t1 = Date.now();
   let best = m1;
   for (let r = 0; r < 2 && Math.abs(best.score - target) > 4; r++) {
-    $("#loadProg").textContent = best.score > target
+    tell(best.score > target
       ? `${what} hedeften zor çıktı, bazı kelimeler sadeleştiriliyor${r ? " (2. tur)" : ""}…`
-      : `${what} hedeften kolay çıktı, hedef kelimeler ekleniyor${r ? " (2. tur)" : ""}…`;
+      : `${what} hedeften kolay çıktı, hedef kelimeler ekleniyor${r ? " (2. tur)" : ""}…`);
     try {
       const rev = await state.sample.json(revisePrompt(title, paragraphs, target, best, terms), { modelTier: "default", signal, schema: SWAPS_SCHEMA });
       const swaps = rev && Array.isArray(rev.swaps) ? rev.swaps : [];
@@ -2273,7 +2334,7 @@ async function reviseToTarget(title, paragraphs, target, terms, m1, signal, what
       const cands = locateSwaps(paragraphs, swaps, terms);
       let good = [];
       if (cands.length) {
-        $("#loadProg").textContent = "Önerilen kelimeler doğallık ve anlam açısından kontrol ediliyor…";
+        tell("Önerilen kelimeler doğallık ve anlam açısından kontrol ediliyor…");
         const chk = await state.sample.json(checkSwapsPrompt(cands), { modelTier: "default", signal, schema: OK_SCHEMA });
         const okIdx = new Set((chk && Array.isArray(chk.ok) ? chk.ok : []).map((x) => parseInt(x, 10) - 1));
         good = cands.filter((c, k) => okIdx.has(k));
@@ -4067,14 +4128,15 @@ async function photoToBlob(file) {
   c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
   return new Promise((r) => c.toBlob(r, "image/jpeg", 0.85));
 }
-async function transcribe(blobs, onProg) {
+const DOC_TRANSCRIBE = (n) => `These are ${n} page image(s) from a document, in order. Transcribe all of the English text exactly as written, in reading order. Put a blank line between paragraphs and "## " before headings. Leave out page numbers, running headers and footers, and the contents of figures and tables. Reply with only the text.`;
+async function transcribe(blobs, onProg, promptFor) {
   const lim = typeof state.sample.limits === "function" ? await state.sample.limits() : null;
   if (!lim || !lim.images) throw { code: "images_unavailable" };
   const max = Math.max(1, lim.images.maxCount || 1);
   const out = [];
   for (let i = 0; i < blobs.length; i += max) {
     const batch = blobs.slice(i, i + max);
-    const { text } = await state.sample(`These are ${batch.length} page image(s) from a document, in order. Transcribe all of the English text exactly as written, in reading order. Put a blank line between paragraphs and "## " before headings. Leave out page numbers, running headers and footers, and the contents of figures and tables. Reply with only the text.`, { images: batch, modelTier: "vision", cache: false });
+    const { text } = await state.sample((promptFor || DOC_TRANSCRIBE)(batch.length), { images: batch, modelTier: "vision", cache: false });
     out.push(String(text || "").trim());
     if (onProg) onProg(Math.min(i + max, blobs.length), blobs.length);
   }
@@ -4362,6 +4424,513 @@ $("#impPhoto").onchange = async (e) => {
     impMsg(err && err.code === "images_unavailable" ? "Fotoğraf gönderme izni yok. Sayfayı yenileyip izni onayla." : errorCopy(err, "Fotoğraf metni"), true);
   }
 };
+
+/* =========================================================
+   Writing ("Yazılarım"): the reader's own English, checked for mistakes and rewritten fluently,
+   shown side by side. The writer's level is the score of their corrected text; the rewrite aims
+   at that score unless the reader asks for another one.
+   ========================================================= */
+state.writings = [];
+state.wDraft = { text: "", source: "typed", mode: "own", target: "" };
+const W_MAX_WORDS = 1500;
+const WTYPE_TR = { grammar: "dil bilgisi", spelling: "yazım", word: "kelime seçimi", punctuation: "noktalama" };
+const WSRC_TR = { typed: "yazdın", photo: "fotoğraftan", pdf: "PDF’ten" };
+const WCHECK_SCHEMA = {
+  type: "object",
+  properties: {
+    errors: { type: "array", items: { type: "object", properties: {
+      p: { type: "integer" }, wrong: { type: "string" }, right: { type: "string" },
+      type: { type: "string", enum: ["grammar", "spelling", "word", "punctuation"] }, why: { type: "string" },
+    }, required: ["p", "wrong", "right", "type", "why"], additionalProperties: false } },
+    corrected: { type: "array", items: { type: "string" } },
+    cefr: { type: "string", enum: LV },
+    feedback: { type: "string" },
+  },
+  required: ["errors", "corrected", "cefr", "feedback"], additionalProperties: false,
+};
+const WREWRITE_SCHEMA = { type: "object", properties: { paragraphs: { type: "array", items: { type: "string" } } }, required: ["paragraphs"], additionalProperties: false };
+// One paragraph per line; blank lines and stray spaces do not matter.
+const writingParas = (raw) => String(raw || "").replace(/\r\n?/g, "\n").split(/\n+/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+const numbered = (paras) => paras.map((x, i) => `[${i + 1}] ${x}`).join("\n\n");
+function writingCheckPrompt(paras) {
+  return `You are checking a piece of writing by a Turkish adult who is learning English. The paragraphs are numbered.
+
+<writing>
+${numbered(paras)}
+</writing>
+
+Work like a careful, encouraging English teacher.
+
+1. "errors": every real mistake: grammar, spelling, word choice, word order, missing or extra words, wrong capital letters, clearly wrong punctuation. A Turkish keyboard often produces a dotless "ı" instead of "I"; count that as a spelling mistake. Do not mark anything that is correct in standard British or American English: informal but correct language, contractions, and matters of style are not mistakes. For each mistake:
+   - "p": the paragraph number
+   - "wrong": the words exactly as they appear in that paragraph, copied character for character with the writer's own spelling, as few words as are needed to show the mistake (usually 1 to 4)
+   - "right": what those words should be
+   - "type": "grammar", "spelling", "word" (wrong word or word form) or "punctuation"
+   - "why": one short sentence in simple Turkish that explains the rule to a learner
+   List every occurrence separately, in the order they appear. If there are no mistakes, give an empty list.
+2. "corrected": the paragraphs with exactly these mistakes fixed and nothing else changed, one string per paragraph, the same number of paragraphs.
+3. "cefr": the writer's level (A1, A2, B1, B2, C1 or C2), judged from the range and accuracy of their grammar and vocabulary.
+4. "feedback": one or two sentences in Turkish, speaking to the writer as "sen": one thing they did well, and the most useful thing to work on.
+
+Reply with only this JSON:
+{"errors": [{"p": 1, "wrong": "...", "right": "...", "type": "grammar", "why": "..."}], "corrected": ["..."], "cefr": "B1", "feedback": "..."}`;
+}
+function writingRewritePrompt(paras, target, own) {
+  const v = vocabRule(target, paras.reduce((a, x) => a + wc(x), 0));
+  // Measured: without this, a rewrite asked for well above the writer's level stays close to the original's words.
+  const shift = own == null || Math.abs(target - own) <= 8 ? ""
+    : target > own
+      ? `
+- Your version must read clearly more advanced than the original: wherever an everyday word or phrase appears, use the more precise, more sophisticated word a skilled ${scoreName(target)}-level writer would choose. Keep it natural and keep the meaning.`
+      : `
+- Your version must read clearly simpler than the original: replace difficult words and phrases with everyday ones a ${scoreName(target)}-level reader knows. Keep it natural and keep the meaning.`;
+  return `You are rewriting a piece of writing by a Turkish adult who is learning English. Its mistakes have already been corrected. The paragraphs are numbered.
+
+<writing>
+${numbered(paras)}
+</writing>
+
+Rewrite it the way a skilled native writer would say the same things: natural, idiomatic and fluent, with smooth links between the sentences. For example, "I did it but I did not like it." could become "I gave it a shot, but I didn't love it."
+- Keep the writer's meaning, ideas, facts, point of view (I, we, they) and tone (personal, formal or informal). Add nothing new and leave nothing out.
+- Keep the same number of paragraphs: your paragraph 1 says what their paragraph 1 says, and so on.
+- Keep about the same length (within about 20%).${shift}
+- ${v.text}
+- ${sentRule(target)}
+
+Reply with only this JSON:
+{"paragraphs": ["...", "..."]}`;
+}
+const WRITING_TRANSCRIBE = (n) => `These are ${n} photo(s) or page image(s) of something an English learner wrote, in order. Transcribe the English text exactly as it is written, including every mistake in spelling, grammar, capital letters and punctuation: do not correct, improve or complete anything. Write each paragraph on one line (join the lines inside a paragraph) and put a blank line between paragraphs. Write [?] for a word that cannot be read, and leave out anything crossed out. Reply with only the text.`;
+
+// Finds each mistake in its paragraph, in order, so repeated mistakes ("ı ... ı") land on separate places.
+// Overlapping or unfound mistakes stay in the list but are not marked in the text.
+function locateErrors(paras, errors) {
+  const from = paras.map(() => 0);
+  const taken = paras.map(() => []);
+  return (errors || []).map((e) => {
+    const i = parseInt(e.p, 10) - 1;
+    const wrong = String(e.wrong || "").trim(), right = String(e.right || "").trim();
+    const out = { p: i, wrong, right, type: WTYPE_TR[e.type] ? e.type : "grammar", why: String(e.why || "").trim(), at: -1 };
+    if (!paras[i] || !wrong || wrong === right) return out;
+    const para = paras[i];
+    const find = (start) => {
+      let k = para.indexOf(wrong, start);
+      if (k < 0) k = para.toLowerCase().indexOf(wrong.toLowerCase(), start);
+      return k;
+    };
+    const clash = (k) => taken[i].some(([a, b]) => k < b && k + wrong.length > a);
+    let k = find(from[i]);
+    while (k >= 0 && clash(k)) k = find(k + 1);
+    if (k < 0) { k = find(0); while (k >= 0 && clash(k)) k = find(k + 1); }
+    if (k >= 0) { out.at = k; out.wrong = para.slice(k, k + wrong.length); taken[i].push([k, k + wrong.length]); from[i] = k + wrong.length; }
+    return out;
+  }).filter((e) => e.p >= 0 && e.p < paras.length && e.wrong && e.wrong !== e.right);
+}
+// The original with the marked mistakes replaced: what the reader sees as "Düzeltilmiş".
+function applyErrors(paras, errs) {
+  return paras.map((x, i) => {
+    errs.filter((e) => e.p === i && e.at >= 0).sort((a, b) => b.at - a.at)
+      .forEach((e) => { x = x.slice(0, e.at) + e.right + x.slice(e.at + e.wrong.length); });
+    return x.replace(/ {2,}/g, " ").trim();
+  });
+}
+// The writer's level: score of the corrected text, measured twice so the reference band settles.
+function writerScore(paras) {
+  let m = measure(paras, 50, []);
+  m = measure(paras, m.score, []);
+  return { score: round(m.score * 10) / 10, n: m.n };
+}
+const wKey = (t) => String(round(t));
+function writingTitle(paras) {
+  const first = paras[0] || "";
+  const ws = first.split(/\s+/).slice(0, 7).join(" ");
+  return ws.length < first.length ? ws.replace(/[,.;:!?]+$/, "") + "…" : ws;
+}
+function wSay(w, t) {
+  w._msg = t;
+  if (state.curWriting === w.id && !$("#writedoc").hidden) { const m = $("#wProg"); if (m) m.textContent = t; }
+}
+function wRefresh(w) {
+  saveDoc(w);
+  if (state.curWriting === w.id && !$("#writedoc").hidden) renderWritingDoc(w);
+  if (!$("#writing").hidden) renderWritingList();
+}
+
+async function checkWriting(w, target) {
+  if (!state.sample) { w.status = "failed"; w.error = NO_KEY; return wRefresh(w); }
+  w.status = "checking"; w.error = "";
+  wRefresh(w);
+  try {
+    wSay(w, "Hatalar kontrol ediliyor…");
+    const r = await state.sample.json(writingCheckPrompt(w.paras), { modelTier: "check", schema: WCHECK_SCHEMA, cache: false });
+    const errors = locateErrors(w.paras, r && r.errors);
+    const fixed = applyErrors(w.paras, errors);
+    const corr = r && Array.isArray(r.corrected) ? r.corrected.map((x) => String(x || "").trim()) : [];
+    // The model's corrected text is the base for scoring and rewriting when it lines up with the original.
+    const base = corr.length === w.paras.length && corr.every(Boolean) ? corr : fixed;
+    w.check = { errors, fixed, base, cefr: LV.includes(r && r.cefr) ? r.cefr : "", feedback: String((r && r.feedback) || "").trim(), model: TIERS.check.model, at: Date.now() };
+    w.own = writerScore(base);
+    w.status = "writing";
+    wRefresh(w);
+  } catch (e) {
+    w.status = "failed";
+    w.error = errorCopy(e, "Yazı kontrolü");
+    return wRefresh(w);
+  }
+  await rewriteWriting(w, target == null ? w.own.score : target);
+}
+async function rewriteWriting(w, target) {
+  target = Math.max(0, Math.min(100, Number(target) || 0));
+  const key = wKey(target);
+  w.versions = w.versions || {};
+  w.error = "";
+  if (w.versions[key]) { w.cur = key; w.status = "done"; return wRefresh(w); }
+  if (!state.sample) { w.status = "done"; w.error = NO_KEY; return wRefresh(w); }
+  w.status = "writing"; w.pending = round(target);
+  w._msg = `Akıcı hali yazılıyor (hedef puan ${round(target)}, ${scoreName(target)})…`;
+  wRefresh(w);
+  try {
+    const base = w.check.base;
+    const r = await state.sample.json(writingRewritePrompt(base, target, w.own && w.own.score), { modelTier: "default", schema: WREWRITE_SCHEMA, cache: false });
+    let paras = (r && Array.isArray(r.paragraphs) ? r.paragraphs : []).map((x) => String(x || "").replace(/\s+/g, " ").trim()).filter(Boolean);
+    if (!paras.length) throw { code: "invalid_json" };
+    let m = measure(paras, target, []);
+    const first = round(m.score * 10) / 10;
+    // Long enough for the score to mean something: bring it toward the target with checked word swaps.
+    if (Math.abs(m.score - target) > 4 && m.n >= 25) {
+      const res = await reviseToTarget(w.title, paras, target, [], m, null, "Akıcı hali", (t) => wSay(w, t));
+      paras = res.paragraphs;
+      m = measure(paras, target, []);
+    }
+    w.versions[key] = { target: round(target), paras, score: round(m.score * 10) / 10, first, aligned: paras.length === base.length, at: Date.now() };
+    w.cur = key;
+    w.pending = null;
+  } catch (e) {
+    w.error = errorCopy(e, "Akıcı hali");
+  }
+  w.status = "done";
+  wRefresh(w);
+}
+
+/* Writing screens */
+function showWriting() { show("writing"); renderWriting(); }
+function openWriting(id) {
+  const w = state.writings.find((x) => x.id === id);
+  if (!w) return showWriting();
+  state.curWriting = id;
+  show("writedoc");
+  renderWritingDoc(w);
+}
+function wMsg(t, err) { const m = $("#wMsg"); if (m) { m.textContent = t || ""; m.className = err ? "err" : "hint"; } }
+function numInput(label, value) {
+  const num = el("input", "wnum");
+  num.type = "number"; num.min = "0"; num.max = "100"; num.inputMode = "numeric"; num.placeholder = "0–100";
+  num.setAttribute("aria-label", label);
+  if (value != null) num.value = value;
+  return num;
+}
+const chipBtn = (label, pressed, fn) => {
+  const b = el("button", "chip", label);
+  b.type = "button";
+  b.setAttribute("aria-pressed", String(!!pressed));
+  b.onclick = fn;
+  return b;
+};
+function renderWriting() {
+  const box = $("#writing"), dr = state.wDraft;
+  const keepMsg = $("#wMsg") ? [$("#wMsg").textContent, $("#wMsg").className] : null;
+  box.innerHTML = "";
+  box.append(el("h1", null, "Yazılarım"));
+  box.append(el("p", "lvl", "İngilizce bir şey yaz ya da yazdığının fotoğrafını veya PDF’ini ekle. Hatalarını gösterir ve aynı metnin akıcı halini yanına yazar."));
+  const ta = el("textarea", "imptext wtext");
+  ta.id = "wText";
+  ta.placeholder = "Buraya İngilizce yaz…";
+  ta.setAttribute("aria-label", "Yazın");
+  ta.value = dr.text;
+  ta.oninput = () => { dr.text = ta.value; if (!ta.value.trim()) dr.source = "typed"; };
+  box.append(ta);
+
+  const lv = el("div", "wlevel");
+  lv.append(el("span", "wlbl", "Akıcı hali:"));
+  const num = numInput("Hedef puan", dr.target);
+  num.hidden = dr.mode !== "set";
+  num.oninput = () => { dr.target = num.value; };
+  lv.append(
+    chipBtn("Benim seviyemde", dr.mode !== "set", () => { dr.mode = "own"; renderWriting(); }),
+    chipBtn("Belirli bir puanda", dr.mode === "set", () => { dr.mode = "set"; renderWriting(); const n = $("#writing .wnum"); if (n) n.focus(); }),
+    num,
+  );
+  box.append(lv);
+
+  const acts = el("div", "acts wacts");
+  const go = actBtn("Kontrol et", () => startWriting(), true);
+  go.id = "wGo";
+  const fileBtn = (label, id, accept, multi, fn) => {
+    const s = el("span", "filebtn", label);
+    const i = el("input");
+    i.type = "file"; i.accept = accept; i.multiple = multi; i.id = id;
+    i.setAttribute("aria-label", label);
+    i.onchange = (e) => fn(e.target);
+    s.append(i);
+    return s;
+  };
+  acts.append(go,
+    fileBtn("Fotoğraf ekle", "wPhoto", "image/*", true, (t) => writingPhotos([...t.files].slice(0, 10), t)),
+    fileBtn("PDF seç", "wPdf", "application/pdf,.pdf", false, (t) => writingPdf(t.files[0], t)));
+  box.append(acts);
+  const msg = el("p", "hint"); msg.id = "wMsg";
+  if (keepMsg) { msg.textContent = keepMsg[0]; msg.className = keepMsg[1]; }
+  box.append(msg);
+
+  const lb = el("div"); lb.id = "wListBox";
+  box.append(lb);
+  renderWritingList();
+}
+function renderWritingList() {
+  const box = $("#wListBox");
+  if (!box) return;
+  box.innerHTML = "";
+  if (state.writings.length) {
+    box.append(el("h2", "wh2", "Önceki yazıların"));
+    const ul = el("ul", "wlist");
+    state.writings.forEach((w) => {
+      const li = el("li");
+      const b = el("button", "wrowbtn");
+      b.type = "button";
+      b.append(el("span", "tt", w.title));
+      const bits = [new Date(w.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })];
+      if (w.check) bits.push(w.check.errors.length ? `${w.check.errors.length} hata` : "hata yok", `puan ${round(w.own.score)}`);
+      else bits.push(w.status === "checking" ? "kontrol ediliyor" : "kontrol edilemedi");
+      b.append(el("span", "meta", bits.join(" · ")));
+      b.onclick = () => openWriting(w.id);
+      li.append(b);
+      ul.append(li);
+    });
+    box.append(ul);
+  }
+}
+async function writingPhotos(files, input) {
+  if (input) input.value = "";
+  if (!files.length) return;
+  if (!state.sample) { wMsg(NO_KEY, true); return; }
+  try {
+    const blobs = [];
+    for (const f of files) { wMsg(`Fotoğraf hazırlanıyor: ${blobs.length + 1}/${files.length}`); blobs.push(await photoToBlob(f)); }
+    const text = await transcribe(blobs, (a, b) => wMsg(`Claude yazını okuyor: ${a}/${b}`), WRITING_TRANSCRIBE);
+    addDraftText(text, "photo");
+    wMsg("Yazın metne çevrildi. Yanlış okunan yer varsa düzelt, sonra “Kontrol et”e bas.");
+  } catch (err) {
+    logErr("wphoto", err);
+    wMsg(err && err.code === "images_unavailable" ? "Fotoğraf gönderme izni yok. Sayfayı yenileyip izni onayla." : errorCopy(err, "Fotoğraf metni"), true);
+  }
+}
+async function writingPdf(file, input) {
+  if (input) input.value = "";
+  if (!file) return;
+  try {
+    wMsg("PDF okuyucu yükleniyor…");
+    const { pages, pdf, total } = await pdfToPages(file, (i, n) => wMsg(`PDF okunuyor: ${i}/${n} sayfa`));
+    const chars = pages.reduce((a, x) => a + x.join(" ").length, 0);
+    let text;
+    if (chars / Math.max(1, pages.length) < 120) {
+      if (!state.sample) { wMsg("Bu PDF taranmış görünüyor; okumak için API anahtarı gerekiyor. " + NO_KEY, true); return; }
+      const n = Math.min(total, 10), blobs = [];
+      for (let i = 1; i <= n; i++) { wMsg(`Taranmış PDF: sayfa ${i}/${n} hazırlanıyor`); blobs.push(await pageToBlob(pdf, i)); }
+      text = await transcribe(blobs, (a, b) => wMsg(`Claude sayfaları okuyor: ${a}/${b}`), WRITING_TRANSCRIBE);
+    } else {
+      text = cleanPdf(pages, true).flatMap((b) => [b.heading, ...b.paras]).filter(Boolean).join("\n\n");
+    }
+    addDraftText(text, "pdf");
+    wMsg("PDF’teki metin eklendi. Göz gezdir, sonra “Kontrol et”e bas.");
+  } catch (err) {
+    logErr("wpdf", err);
+    wMsg(err && err.code ? errorCopy(err, "PDF") : "PDF açılamadı. Dosya bozuk ya da şifreli olabilir; metni kopyalayıp yapıştırmayı dene.", true);
+  }
+}
+function addDraftText(text, source) {
+  const dr = state.wDraft;
+  dr.text = (dr.text.trim() ? dr.text.trim() + "\n\n" : "") + String(text || "").trim();
+  dr.source = source;
+  const ta = $("#wText");
+  if (ta) ta.value = dr.text;
+}
+function startWriting() {
+  const dr = state.wDraft;
+  const paras = writingParas(dr.text);
+  const n = paras.reduce((a, x) => a + wc(x), 0);
+  if (n < 3) { wMsg("Önce birkaç kelime yaz.", true); return; }
+  if (n > W_MAX_WORDS) { wMsg(`Metin çok uzun (${n} kelime). En fazla ${W_MAX_WORDS} kelime kontrol edilebiliyor.`, true); return; }
+  let target = null;
+  if (dr.mode === "set") {
+    const t = Number(String(dr.target).replace(",", "."));
+    if (String(dr.target).trim() === "" || !(t >= 0 && t <= 100)) { wMsg("Hedef puanı 0 ile 100 arasında yaz.", true); return; }
+    target = t;
+  }
+  if (!state.sample) { wMsg(NO_KEY, true); return; }
+  const w = { kind: "writing", id: "w" + Date.now().toString(36), createdAt: Date.now(), title: writingTitle(paras), source: dr.source || "typed", paras, words: n, versions: {}, status: "checking" };
+  state.writings.unshift(w);
+  state.wDraft = { text: "", source: "typed", mode: dr.mode, target: dr.target };
+  saveDoc(w);
+  openWriting(w.id);
+  checkWriting(w, target);
+}
+// The writer's paragraph with its mistakes marked; each mark opens its explanation.
+function markedPara(para, errs, onTap) {
+  const p = el("p", "wp");
+  let last = 0;
+  errs.filter((e) => e.at >= 0).sort((a, b) => a.at - b.at).forEach((e) => {
+    if (e.at > last) p.append(para.slice(last, e.at));
+    const m = el("button", "werr", para.slice(e.at, e.at + e.wrong.length));
+    m.type = "button";
+    m.setAttribute("aria-label", `Hata: ${e.wrong}. Doğrusu: ${e.right || "silinmeli"}`);
+    m.onclick = () => onTap(e, m);
+    p.append(m);
+    last = e.at + e.wrong.length;
+  });
+  if (last < para.length) p.append(para.slice(last));
+  return p;
+}
+function fixedPara(para, errs) {
+  const p = el("p", "wp");
+  let last = 0;
+  errs.filter((e) => e.at >= 0).sort((a, b) => a.at - b.at).forEach((e) => {
+    if (e.at > last) p.append(para.slice(last, e.at));
+    if (e.right) p.append(el("mark", "wfix", e.right));
+    last = e.at + e.wrong.length;
+  });
+  if (last < para.length) p.append(para.slice(last));
+  return p;
+}
+function errLine(e) {
+  const d = el("div", "wtip");
+  const top = el("div", "wtiptop");
+  top.append(el("s", null, e.wrong), " → ", el("b", null, e.right || "(silinmeli)"), el("span", "wtype", WTYPE_TR[e.type]));
+  d.append(top);
+  if (e.why) d.append(el("p", null, e.why));
+  return d;
+}
+function renderWritingDoc(w) {
+  const box = $("#writedoc");
+  box.innerHTML = "";
+  const head = el("div", "dochead");
+  head.append(el("h1", "wtitle", w.title));
+  head.append(el("p", "lvl", `${new Date(w.createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })} · ${w.words} kelime · ${WSRC_TR[w.source] || "yazdın"}`));
+  box.append(head);
+  const busy = w.status === "checking" || w.status === "writing";
+  if (busy) { const pr = el("p", "wait wprog", w._msg || "Hazırlanıyor…"); pr.id = "wProg"; box.append(pr); }
+  if (w.error && !busy) {
+    const n = el("div", "notice");
+    n.append(el("span", null, w.error + " "));
+    const again = el("button", "linkbtn", "Tekrar dene");
+    again.type = "button";
+    again.onclick = () => {
+      if (!w.check) return checkWriting(w, null);
+      const cur = w.versions && w.versions[w.cur];
+      rewriteWriting(w, w.pending != null ? w.pending : cur ? cur.target : w.own.score);
+    };
+    n.append(again);
+    box.append(n);
+  }
+  if (!w.check) {
+    box.append(...w.paras.map((x) => el("p", "wp", x)));
+    return;
+  }
+  const c = w.check, errs = c.errors, own = w.own || { score: 0, n: 0 };
+  const sum = el("div", "wsum");
+  sum.append(el("p", "wlevelline", `Senin seviyen: puan ${round(own.score)} (${scoreName(own.score)})${c.cefr ? ` · Claude’un tahmini ${c.cefr}` : ""}`));
+  sum.append(el("p", "wcount", errs.length ? `${errs.length} hata bulundu. İşaretli yerlere dokununca açıklaması çıkar.` : "Dil bilgisi ya da yazım hatası bulunmadı."));
+  if (own.n < 40) sum.append(el("p", "hint", "Metin kısa olduğu için puan kaba bir tahmin."));
+  if (c.feedback) sum.append(el("p", "wfeed", c.feedback));
+  box.append(sum);
+
+  // Level of the fluent version: the writer's own score, earlier targets, or a new number.
+  const v = w.versions && w.versions[w.cur];
+  const lvBox = el("div", "wlevel");
+  lvBox.append(el("span", "wlbl", "Akıcı hali:"));
+  const ownKey = wKey(own.score);
+  const ownB = chipBtn(`Benim seviyem (${round(own.score)})`, w.cur === ownKey, () => rewriteWriting(w, own.score));
+  ownB.disabled = busy;
+  lvBox.append(ownB);
+  Object.keys(w.versions || {}).filter((k) => k !== ownKey).sort((a, b) => a - b).forEach((k) => {
+    const b = chipBtn(k, w.cur === k, () => { w.cur = k; w.error = ""; wRefresh(w); });
+    b.disabled = busy;
+    lvBox.append(b);
+  });
+  const num = numInput("Başka bir hedef puan");
+  const goB = chipBtn("Bu puanda yaz", false, () => {
+    const t = Number(String(num.value).replace(",", "."));
+    if (num.value.trim() === "" || !(t >= 0 && t <= 100)) { toast("0 ile 100 arasında bir puan yaz"); return; }
+    rewriteWriting(w, t);
+  });
+  goB.removeAttribute("aria-pressed");
+  goB.disabled = busy;
+  lvBox.append(num, goB);
+  box.append(lvBox);
+  if (v) {
+    const off = Math.abs(v.score - v.target) > 4;
+    box.append(el("p", "hint wvline", `Akıcı halin puanı ${round(v.score)} (${scoreName(v.score)}), hedef ${v.target}.` + (off ? (own.n < 25 ? " Kısa metinde puan hedeften sapabilir." : " Hedefe tam oturtulamadı.") : "")));
+  }
+
+  // Side by side: the writer's text with its mistakes marked | the fluent version (or only the corrections).
+  const mode = state.wMode === "fixed" || !v ? "fixed" : "fluent";
+  const seg = el("div", "row wseg");
+  [["fluent", "Akıcı hali"], ["fixed", "Sadece düzeltmeler"]].forEach(([k, l]) => {
+    const b = chipBtn(l, mode === k, () => { state.wMode = k; renderWritingDoc(w); });
+    b.disabled = k === "fluent" && !v;
+    seg.append(b);
+  });
+  box.append(seg);
+  const grid = el("div", "wgrid");
+  grid.append(el("div", "wcol-h", "Senin yazdığın"), el("div", "wcol-h", mode === "fixed" ? "Düzeltilmiş" : "Akıcı hali"));
+  const tapErr = (e, m) => {
+    const open = grid.querySelector(".wtip.inrow");
+    grid.querySelectorAll(".werr.on").forEach((x) => x.classList.remove("on"));
+    if (open) { const same = open._err === e; open.remove(); if (same) return; }
+    const tip = errLine(e);
+    tip.classList.add("inrow");
+    tip._err = e;
+    m.classList.add("on");
+    // Under the row that holds the mark, across both columns.
+    const right = m.closest(".wl").nextElementSibling;
+    right.after(tip);
+  };
+  const byPara = (i) => errs.filter((e) => e.p === i);
+  if (mode === "fixed" || v.aligned) {
+    w.paras.forEach((para, i) => {
+      const l = el("div", "wcell wl"), r = el("div", "wcell wr");
+      l.append(markedPara(para, byPara(i), tapErr));
+      r.append(mode === "fixed" ? fixedPara(para, byPara(i)) : el("p", "wp", v.paras[i]));
+      grid.append(l, r);
+    });
+  } else {
+    const l = el("div", "wcell wl"), r = el("div", "wcell wr");
+    w.paras.forEach((para, i) => l.append(markedPara(para, byPara(i), tapErr)));
+    v.paras.forEach((x) => r.append(el("p", "wp", x)));
+    grid.append(l, r);
+  }
+  box.append(grid);
+
+  if (errs.length) {
+    box.append(el("h2", "wh2", `Hatalar (${errs.length})`));
+    const ul = el("ul", "werrs");
+    errs.forEach((e) => { const li = el("li"); li.append(errLine(e)); ul.append(li); });
+    box.append(ul);
+  }
+  const acts = el("div", "acts");
+  acts.append(actBtn("Metni düzenle", () => {
+    state.wDraft = { text: w.paras.join("\n\n"), source: w.source, mode: "own", target: "" };
+    showWriting();
+    wMsg("Düzenleyip yeniden kontrol edebilirsin; yeni bir yazı olarak kaydedilir.");
+  }));
+  acts.append(actBtn("Sil", () => {
+    if (!confirm("Bu yazı silinsin mi?")) return;
+    state.writings = state.writings.filter((x) => x.id !== w.id);
+    deletedIds.add(w.id);
+    if (state.db) col().doc(w.id).delete().catch(() => {});
+    showWriting();
+  }));
+  box.append(acts);
+}
 
 // Signs of PDF extraction trouble in one part (original text only). Returns Turkish labels.
 function auditPart(d) {

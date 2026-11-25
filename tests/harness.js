@@ -117,6 +117,9 @@ function promptKind(p) {
   if (p.includes("wrap the words that translate the expression")) return "translateUnit";
   if (p.startsWith("Translate this English sentence")) return "translate";
   if (p.includes("page image(s) from a document")) return "transcribe";
+  if (p.startsWith("You are checking a piece of writing")) return "wcheck";
+  if (p.startsWith("You are rewriting a piece of writing")) return "wrewrite";
+  if (p.includes("something an English learner wrote")) return "wtranscribe";
   return "other";
 }
 async function fakeAnthropic(w, opts) {
@@ -145,6 +148,7 @@ async function fakeAnthropic(w, opts) {
   const out = RESPOND[call.kind] ? RESPOND[call.kind](prompt, call) : "{}";
   return sseResponse(w, typeof out === "string" ? out : JSON.stringify(out), { model: body.model });
 }
+const writingOf = (p) => between(p, "<writing>\n", "\n</writing>").split(/\n\n/).map((x) => x.replace(/^\[\d+\] /, ""));
 const between = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ""; const j = s.indexOf(b, i + a.length); return s.slice(i + a.length, j < 0 ? undefined : j); };
 const RESPOND = {
   hints: (p) => {
@@ -178,6 +182,17 @@ const RESPOND = {
   simplify: () => "This is a simpler sentence. It keeps the meaning.",
   translate: () => "Bu, cümlenin Türkçe çevirisidir.",
   transcribe: () => FIX.transcribed,
+  wcheck: (p) => {
+    const paras = writingOf(p);
+    const errors = [];
+    paras.forEach((x, i) => {
+      (x.match(/(^|\s)ı(?=\s)/g) || []).forEach(() => errors.push({ p: i + 1, wrong: "ı", right: "I", type: "spelling", why: "Türkçe klavyedeki ı yerine büyük I yazılır." }));
+      if (x.includes("informations")) errors.push({ p: i + 1, wrong: "informations", right: "information", type: "grammar", why: "information sayılamaz." });
+    });
+    return { errors, corrected: paras.map((x) => x.replace(/(^|\s)ı(?=\s)/g, "$1I").replace("informations", "information")), cefr: "A2", feedback: "Fikrini açık anlatmışsın." };
+  },
+  wrewrite: (p) => ({ paragraphs: writingOf(p).map((x) => "Fluent: " + x) }),
+  wtranscribe: () => FIX.writing,
 };
 
 async function fakeWiki(w, url, opts) {
@@ -245,6 +260,7 @@ const FIX = {
   }),
   swapPairs: [["important", "significant"], ["famous", "renowned"], ["study", "examine"], ["agree", "concur"]],
   adapted: ["This is the adapted first paragraph. It uses simple words for the reader.", "This is the adapted second paragraph. It keeps the same ideas in the same order."],
+  writing: "ı did it but ı did not like it.\n\nThe weather was good and we walked a lot.",
   transcribed: "## Chapter One\n\n" + LOREM("the old city", 4) + "\n\n" + LOREM("the river", 4),
   importText: "A Short Book\n\n## The First Part\n\n" + LOREM("the first idea", 5) + "\n\n" + LOREM("the second idea", 5) + "\n\n## The Second Part\n\n" + LOREM("the third idea", 6),
 };

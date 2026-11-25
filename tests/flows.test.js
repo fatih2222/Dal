@@ -465,6 +465,84 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     assert(it.textContent.includes("phrasal verb"), "kind shown");
     noScriptErrors();
   });
+  t("yazı: hatalar işaretleniyor, akıcı hali yan yana", async () => {
+    NET.calls = [];
+    click('#tabs button[data-v="writing"]');
+    await waitFor(() => visible("writing"));
+    const ta = Q("#wText");
+    ta.value = "ı went to the market yesterday and ı bought some apples.\n\nThe seller gave me informations about the fruit.";
+    ta.dispatchEvent(new W.Event("input"));
+    click("#wGo");
+    await waitFor(() => visible("writedoc") && A("state.writings[0].status") === "done", "checked and rewritten");
+    const w = A("state.writings[0]");
+    eq(w.check.errors.length, 3, "three mistakes");
+    eq(w.check.errors.filter((e) => e.at >= 0).length, 3, "all found in the text");
+    eq(QA("#writedoc .werr").length, 3, "three marks");
+    eq(QA("#writedoc .wl").length, 2, "two rows, one per paragraph");
+    assert(Q("#writedoc .wr").textContent.startsWith("Fluent: I went"), "fluent version beside the original");
+    const ck = callsOf("wcheck")[0], rw = callsOf("wrewrite")[0];
+    eq(ck.model, "claude-sonnet-5-5"); eq(rw.model, "claude-haiku-5-5"); assert(ck.schema && rw.schema, "both with a schema");
+    assert(rw.prompt.includes("I went to the market"), "rewrite starts from the corrected text");
+    eq(w.cur, String(Math.round(w.own.score)), "rewrite at the writer's own level");
+    QA("#writedoc .werr")[2].click();
+    assert(Q("#writedoc .wtip.inrow") && Q("#writedoc .wtip.inrow").textContent.includes("information"), "explanation opens");
+    QA("#writedoc .werr")[2].click();
+    assert(!Q("#writedoc .wtip.inrow"), "and closes");
+    QA("#writedoc .wseg .chip").find((b) => b.textContent === "Sadece düzeltmeler").click();
+    eq(QA("#writedoc .wfix").length, 3, "corrections marked");
+    QA("#writedoc .wseg .chip").find((b) => b.textContent === "Akıcı hali").click();
+    eq(W.document.documentElement.scrollWidth, W.document.documentElement.clientWidth, "no sideways scroll");
+    noScriptErrors();
+  });
+  t("yazı: istenen puanda yeniden yazılıyor ve saklanıyor", async () => {
+    NET.calls = [];
+    const num = Q("#writedoc .wlevel .wnum");
+    num.value = "70";
+    QA("#writedoc .wlevel .chip").find((b) => b.textContent === "Bu puanda yaz").click();
+    await waitFor(() => A("state.writings[0].versions")["70"] && A("state.writings[0].status") === "done", "second version");
+    eq(callsOf("wcheck").length, 0, "no second check");
+    const rw = callsOf("wrewrite")[0];
+    assert(rw.prompt.includes("B2 level"), "target band in the prompt");
+    eq(A("state.writings[0].cur"), "70");
+    assert(QA("#writedoc .wlevel .chip").some((b) => b.textContent === "70" && b.getAttribute("aria-pressed") === "true"), "version chip");
+    NET.calls = [];
+    QA("#writedoc .wlevel .chip").find((b) => b.textContent.startsWith("Benim seviyem")).click();
+    await wait(200);
+    eq(NET.calls.length, 0, "earlier version reused");
+    click('#tabs button[data-v="writing"]');
+    await waitFor(() => visible("writing"));
+    assert(Q("#wListBox .wrowbtn").textContent.includes("3 hata"), "listed with its mistakes");
+    noScriptErrors();
+  });
+  t("yazı: belirli puan seçilirse ilk yazım o puanda", async () => {
+    NET.calls = [];
+    QA("#writing .wlevel .chip").find((b) => b.textContent === "Belirli bir puanda").click();
+    const num = Q("#writing .wnum");
+    num.value = "30"; num.dispatchEvent(new W.Event("input"));
+    Q("#wText").value = "We was happy because the trip was very nice for us."; Q("#wText").dispatchEvent(new W.Event("input"));
+    click("#wGo");
+    await waitFor(() => A("state.writings[0].status") === "done" && A("state.writings.length") === 2, "done");
+    eq(A("state.writings[0].cur"), "30");
+    eq(A("state.writings[0].check.errors.length"), 0);
+    assert(Q("#writedoc .wcount").textContent.includes("bulunmadı"), "no mistakes said plainly");
+    noScriptErrors();
+  });
+  t("yazı: fotoğraftaki yazı hatalarıyla okunuyor", async () => {
+    NET.calls = [];
+    click('#tabs button[data-v="writing"]');
+    await waitFor(() => visible("writing"));
+    const c = W.document.createElement("canvas"); c.width = 300; c.height = 200;
+    const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 300, 200);
+    const blob = await new Promise((r) => c.toBlob(r, "image/png"));
+    setFile(Q("#wPhoto"), blob, "note.png", "image/png");
+    await waitFor(() => Q("#wText").value.includes("ı did it"), "transcribed", 10000);
+    const tc = callsOf("wtranscribe")[0];
+    eq(tc.model, "claude-sonnet-5-5");
+    assert(tc.prompt.includes("including every mistake"), "keeps the mistakes");
+    eq(A("state.wDraft.source"), "photo");
+    Q("#wText").value = ""; Q("#wText").dispatchEvent(new W.Event("input"));
+    noScriptErrors();
+  });
   t("silme iki dokunuşla yapılıyor", async () => {
     click('#tabs button[data-v="trees"]');
     await waitFor(() => visible("trees"));
@@ -478,10 +556,13 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
   t("sayfa yenilenince veriler yerinde", async () => {
     A("flushSaves()"); await wait(1200);
     const lib = A("state.library.length"), imps = A("state.imports.length"), words = Object.keys(A("state.nb.words")).length;
+    const writings = A("state.writings.length");
     await loadApp({ fresh: false });
     await waitFor(() => A("state.library.length") === lib, "library reloaded");
     eq(A("state.imports.length"), imps, "imports reloaded");
     eq(Object.keys(A("state.nb.words")).length, words, "notebook reloaded");
+    eq(A("state.writings.length"), writings, "writings reloaded");
+    eq(A("state.writings[0].status"), "done");
     noScriptErrors();
   });
   t("eski kayıtlı ligatürlü belge açılışta onarılıp kaydediliyor", async () => {
