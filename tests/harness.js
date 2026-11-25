@@ -63,7 +63,7 @@ function deleteTestDb() {
 }
 async function loadApp({ fresh = true } = {}) {
   if (frame) { frame.remove(); frame = null; await wait(50); }
-  if (fresh) { await deleteTestDb(); localStorage.removeItem("dal-api-key-test"); }
+  if (fresh) { await deleteTestDb(); localStorage.removeItem("dal-api-key-test"); localStorage.removeItem("dal-wdraft-test"); }
   frame = document.createElement("iframe");
   frame.style.cssText = "width:390px;height:760px;border:1px solid #ccc";
   document.getElementById("stage").append(frame);

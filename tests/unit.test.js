@@ -106,6 +106,8 @@ suite("Kelime seviyeleri (Aşama 2)", (t) => {
     const short = A("vocabRule")(60, 40).text, long = A("vocabRule")(60, 400).text;
     assert(!short.includes("extensive-reading") && !short.includes("guess from the surrounding"), "no far words for a short text");
     assert(long.includes("guess from the surrounding"), "kept for a long text");
+    const cw = A("changedWords")("I did it but I did not like it.", ["I", "gave", "it", "a", "shot", "but", "I", "didn't", "love", "it"]);
+    eq(cw.map((x) => (x ? 1 : 0)).join(""), "0101100110", "changed words found");
     const rp = A("writingRewritePrompt");
     assert(rp(["I like it."], 70, 20).includes("more advanced than the original"), "pushed up when far above");
     assert(rp(["I like it."], 20, 60).includes("simpler than the original"), "pushed down when far below");

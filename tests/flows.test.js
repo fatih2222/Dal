@@ -491,6 +491,24 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     QA("#writedoc .wseg .chip").find((b) => b.textContent === "Sadece düzeltmeler").click();
     eq(QA("#writedoc .wfix").length, 3, "corrections marked");
     QA("#writedoc .wseg .chip").find((b) => b.textContent === "Akıcı hali").click();
+    const chg = QA("#writedoc .wr .ww.wchg").map((x) => x.textContent);
+    assert(chg.includes("Fluent") && !chg.includes("market"), "only changed words tinted: " + chg.join(","));
+    NET.calls = [];
+    const word = QA("#writedoc .wr .ww").find((x) => x.textContent === "market");
+    word.click();
+    await waitFor(() => callsOf("lookup").length && Q("#sheet").classList.contains("open") && Q("#front h3") && Q("#front h3").textContent === "market" && !!A("state.nb.words").market, "word card");
+    assert(callsOf("lookup")[0].prompt.includes("fluent version of something they wrote"), "writing lookup prompt");
+    assert(A("state.nb.words").market, "word in the notebook");
+    assert(word.classList.contains("here"), "word marked");
+    A("closeCard()");
+    assert(!word.classList.contains("here"), "mark cleared on close");
+    NET.calls = [];
+    QA("#writedoc .wr .ww").find((x) => x.textContent === "market").click();
+    await waitFor(() => Q("#sheet").classList.contains("open"), "card again");
+    eq(callsOf("lookup").length, 0, "second tap reuses the meaning");
+    QA("#front .acts button").find((b) => b.textContent === "Bunu biliyordum").click();
+    assert(!A("state.nb.words").market, "removed from the notebook");
+    A("closeCard()");
     eq(W.document.documentElement.scrollWidth, W.document.documentElement.clientWidth, "no sideways scroll");
     noScriptErrors();
   });
@@ -543,6 +561,20 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     Q("#wText").value = ""; Q("#wText").dispatchEvent(new W.Event("input"));
     noScriptErrors();
   });
+  t("yazı: taslak uygulama kapanınca kaybolmuyor", async () => {
+    Q("#wText").value = "This is my unfinished draft about the weekend."; Q("#wText").dispatchEvent(new W.Event("input"));
+    QA("#writing .wlevel .chip").find((b) => b.textContent === "Belirli bir puanda").click();
+    await wait(600);
+    await loadApp({ fresh: false });
+    click('#tabs button[data-v="writing"]');
+    await waitFor(() => visible("writing"));
+    eq(Q("#wText").value, "This is my unfinished draft about the weekend.", "draft back");
+    assert(!Q("#writing .wnum").hidden, "chosen level mode back");
+    Q("#wText").value = ""; Q("#wText").dispatchEvent(new W.Event("input"));
+    QA("#writing .wlevel .chip").find((b) => b.textContent === "Benim seviyemde").click();
+    await wait(500);
+    noScriptErrors();
+  });
   t("silme iki dokunuşla yapılıyor", async () => {
     click('#tabs button[data-v="trees"]');
     await waitFor(() => visible("trees"));
@@ -579,6 +611,7 @@ suite("Akış: hatalar ve kenar durumları", (t) => {
     frame.remove(); frame = null;
     await deleteTestDb();
     localStorage.removeItem("dal-api-key-test");
+    localStorage.removeItem("dal-wdraft-test");
     eq(localStorage.getItem("dal-api-key-test"), null);
   });
 });

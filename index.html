@@ -642,6 +642,11 @@ article h1{margin-top:.3rem}
 .wtiptop s{color:var(--danger)}
 .wtype{margin-left:auto;font-size:.78rem;color:var(--muted)}
 .wtip p{margin:.25rem 0 0;font-size:.92rem}
+.wflu .ww{cursor:pointer;border-radius:4px}
+.wchg{background:var(--mark-soft)}
+.ww.here{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent-soft)}
+.wlegend{margin:-.2rem 0 .4rem;font-size:.85rem}
+.wtrline{font-weight:700;margin:.2rem 0}
 @media (prefers-reduced-motion: reduce){.in-push,.in-pop,.in-fade,.flip.turn-out .face,.flip.turn-in .face{animation:none}.setpanel,.setback,.appbar{transition:none}}
 </style>
 </head>
@@ -3050,6 +3055,7 @@ function closeCard() {
   $("#sheet").classList.remove("open");
   document.body.classList.remove("sheet-open");
   clearMarks();
+  document.querySelectorAll("#writedoc .ww.here").forEach((e) => e.classList.remove("here"));
   state.active = null;
 }
 function closeBtn() {
@@ -3640,6 +3646,11 @@ const dayTitle = (s) => new Date(s + "T12:00").toLocaleDateString("tr-TR", { day
 // Words looked up on each day, from the taps saved with the texts (both views of an imported section).
 function tapsByDay() {
   const out = {};
+  (state.writings || []).forEach((w) => (w.taps || []).forEach((t) => {
+    if (!t || !t.at || !t.lemma) return;
+    const day = dayStr(t.at);
+    (out[day] = out[day] || new Map()).set(norm(t.lemma), t.lemma);
+  }));
   state.library.forEach((d) => {
     const lists = [d.taps || [], ...Object.values(d.views || {}).filter((v) => v && v.taps !== d.taps).map((v) => v.taps || [])];
     lists.forEach((taps) => taps.forEach((t) => {
@@ -4431,7 +4442,20 @@ $("#impPhoto").onchange = async (e) => {
    at that score unless the reader asks for another one.
    ========================================================= */
 state.writings = [];
-state.wDraft = { text: "", source: "typed", mode: "own", target: "" };
+// The unsent draft is kept in this browser, so closing the app does not lose it.
+const WDRAFT_LS = TEST_MODE ? "dal-wdraft-test" : "dal-wdraft";
+state.wDraft = (() => {
+  const d = { text: "", source: "typed", mode: "own", target: "" };
+  try { Object.assign(d, JSON.parse(localStorage.getItem(WDRAFT_LS) || "{}")); } catch (e) {}
+  d.text = String(d.text || ""); d.target = String(d.target || "");
+  return d;
+})();
+function saveDraft(now) {
+  clearTimeout(saveDraft.t);
+  const put = () => { try { localStorage.setItem(WDRAFT_LS, JSON.stringify(state.wDraft)); } catch (e) {} };
+  if (now) put(); else saveDraft.t = setTimeout(put, 400);
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveDraft(true); });
 const W_MAX_WORDS = 1500;
 const WTYPE_TR = { grammar: "dil bilgisi", spelling: "yazım", word: "kelime seçimi", punctuation: "noktalama" };
 const WSRC_TR = { typed: "yazdın", photo: "fotoğraftan", pdf: "PDF’ten" };
@@ -4647,17 +4671,17 @@ function renderWriting() {
   ta.placeholder = "Buraya İngilizce yaz…";
   ta.setAttribute("aria-label", "Yazın");
   ta.value = dr.text;
-  ta.oninput = () => { dr.text = ta.value; if (!ta.value.trim()) dr.source = "typed"; };
+  ta.oninput = () => { dr.text = ta.value; if (!ta.value.trim()) dr.source = "typed"; saveDraft(); };
   box.append(ta);
 
   const lv = el("div", "wlevel");
   lv.append(el("span", "wlbl", "Akıcı hali:"));
   const num = numInput("Hedef puan", dr.target);
   num.hidden = dr.mode !== "set";
-  num.oninput = () => { dr.target = num.value; };
+  num.oninput = () => { dr.target = num.value; saveDraft(); };
   lv.append(
-    chipBtn("Benim seviyemde", dr.mode !== "set", () => { dr.mode = "own"; renderWriting(); }),
-    chipBtn("Belirli bir puanda", dr.mode === "set", () => { dr.mode = "set"; renderWriting(); const n = $("#writing .wnum"); if (n) n.focus(); }),
+    chipBtn("Benim seviyemde", dr.mode !== "set", () => { dr.mode = "own"; saveDraft(true); renderWriting(); }),
+    chipBtn("Belirli bir puanda", dr.mode === "set", () => { dr.mode = "set"; saveDraft(true); renderWriting(); const n = $("#writing .wnum"); if (n) n.focus(); }),
     num,
   );
   box.append(lv);
@@ -4751,6 +4775,7 @@ function addDraftText(text, source) {
   const dr = state.wDraft;
   dr.text = (dr.text.trim() ? dr.text.trim() + "\n\n" : "") + String(text || "").trim();
   dr.source = source;
+  saveDraft(true);
   const ta = $("#wText");
   if (ta) ta.value = dr.text;
 }
@@ -4770,6 +4795,7 @@ function startWriting() {
   const w = { kind: "writing", id: "w" + Date.now().toString(36), createdAt: Date.now(), title: writingTitle(paras), source: dr.source || "typed", paras, words: n, versions: {}, status: "checking" };
   state.writings.unshift(w);
   state.wDraft = { text: "", source: "typed", mode: dr.mode, target: dr.target };
+  saveDraft(true);
   saveDoc(w);
   openWriting(w.id);
   checkWriting(w, target);
@@ -4899,15 +4925,17 @@ function renderWritingDoc(w) {
     w.paras.forEach((para, i) => {
       const l = el("div", "wcell wl"), r = el("div", "wcell wr");
       l.append(markedPara(para, byPara(i), tapErr));
-      r.append(mode === "fixed" ? fixedPara(para, byPara(i)) : el("p", "wp", v.paras[i]));
+      r.append(mode === "fixed" ? fixedPara(para, byPara(i)) : fluentPara(v.paras[i], c.base[i] || "", i));
       grid.append(l, r);
     });
   } else {
     const l = el("div", "wcell wl"), r = el("div", "wcell wr");
     w.paras.forEach((para, i) => l.append(markedPara(para, byPara(i), tapErr)));
-    v.paras.forEach((x) => r.append(el("p", "wp", x)));
+    v.paras.forEach((x, k) => r.append(fluentPara(x, c.base.join(" "), k)));
     grid.append(l, r);
   }
+  grid.addEventListener("click", (e) => { const s = e.target.closest(".ww"); if (s) tapFluentWord(w, s); });
+  if (mode === "fluent") box.append(el("p", "hint wlegend", "Sarı yerler akıcı halde değişen ifadeler. Bir kelimeye dokununca anlamı çıkar ve Defter’e eklenir."));
   box.append(grid);
 
   if (errs.length) {
@@ -4919,6 +4947,7 @@ function renderWritingDoc(w) {
   const acts = el("div", "acts");
   acts.append(actBtn("Metni düzenle", () => {
     state.wDraft = { text: w.paras.join("\n\n"), source: w.source, mode: "own", target: "" };
+    saveDraft(true);
     showWriting();
     wMsg("Düzenleyip yeniden kontrol edebilirsin; yeni bir yazı olarak kaydedilir.");
   }));
@@ -4930,6 +4959,150 @@ function renderWritingDoc(w) {
     showWriting();
   }));
   box.append(acts);
+}
+
+// Word-level difference between the writer's corrected text and the fluent version: true for each fluent word
+// that is not part of the longest common word sequence (what the rewrite changed or added).
+function changedWords(base, fluent) {
+  const a = (String(base).match(WORD_RE) || []).map(norm), b = fluent.map(norm);
+  const n = a.length, m = b.length;
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = new Array(m).fill(true);
+  for (let i = 0, j = 0; i < n && j < m;) {
+    if (a[i] === b[j]) { out[j] = false; i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) i++;
+    else j++;
+  }
+  return out;
+}
+// A fluent paragraph as tappable words; words the rewrite changed are tinted (runs joined across the spaces).
+function fluentPara(text, base, pi) {
+  const p = el("p", "wp wflu");
+  const ms = [...String(text).matchAll(WORD_RE)];
+  const chg = changedWords(base, ms.map((m) => m[0]));
+  let last = 0;
+  ms.forEach((m, k) => {
+    const gap = text.slice(last, m.index);
+    if (gap) p.append(k > 0 && chg[k] && chg[k - 1] && /^\s+$/.test(gap) ? el("span", "wchg", gap) : gap);
+    const s = el("span", "ww" + (chg[k] ? " wchg" : ""), m[0]);
+    s.dataset.p = pi; s.dataset.o = m.index;
+    p.append(s);
+    last = m.index + m[0].length;
+  });
+  if (last < text.length) p.append(text.slice(last));
+  return p;
+}
+const sentenceAtOffset = (para, o) => {
+  let from = 0;
+  for (const s of splitSentences(para)) {
+    const at = para.indexOf(s, from);
+    if (at >= 0 && o >= at && o < at + s.length) return s;
+    if (at >= 0) from = at + s.length;
+  }
+  return para;
+};
+// Tap on a word of the fluent version: its meaning in a card (cached per writing), and into the notebook.
+async function tapFluentWord(w, span) {
+  const v = w.versions && w.versions[w.cur];
+  if (!v) return;
+  const para = v.paras[+span.dataset.p] || "";
+  const sentence = sentenceAtOffset(para, +span.dataset.o);
+  const word = span.textContent, low = norm(word);
+  document.querySelectorAll("#writedoc .ww.here").forEach((x) => x.classList.remove("here"));
+  span.classList.add("here");
+  w.units = w.units || [];
+  const hit = w.units.find((u) => u.sentence === sentence && [u.text, u.lemma, ...(u.forms || [])].some((f) => (String(f).match(WORD_RE) || []).map(norm).includes(low)));
+  state.active = { writing: w.id, k: null, loading: word, key: sentence + "|" + low };
+  if (hit) return showWordCard(w, hit, span);
+  renderWordCard(w, null, word);
+  openWordCard();
+  if (!state.sample) { renderCardError(NO_KEY); return; }
+  const key = state.active.key;
+  const prompt = `You help a Turkish learner of English who is reading a fluent version of something they wrote themselves.
+
+Sentence: "${sentence}"
+Tapped word: "${word}"
+
+If the tapped word is part of a phrasal verb, idiom or fixed expression in this sentence, give that whole expression as the unit.
+
+Reply with only this JSON:
+{"text": "the unit exactly as written in the sentence", "lemma": "dictionary form", "type": "word | phrasal | idiom | collocation", "forms": ["all inflected forms of the unit"], "def": "short, simple English definition fitting this context, max 15 words", "tr": "Turkish equivalent in this context, 1 to 4 words", "cefr": "CEFR level (A1, A2, B1, B2, C1 or C2) of the unit in this particular meaning", "sentence_tr": "the whole sentence in natural Turkish, with [[ ]] around the Turkish words that translate the unit"}`;
+  try {
+    const out = await state.sample.json(prompt, { modelTier: "quick" });
+    const [u] = cleanUnits([out]);
+    if (!u) throw { code: "invalid_json" };
+    u.sentence = sentence;
+    u.sentence_tr = out && typeof out.sentence_tr === "string" ? out.sentence_tr.trim() : "";
+    w.units.push(u);
+    (w.taps = w.taps || []).push({ key: "u:" + norm(u.lemma), lemma: u.lemma, at: Date.now() });
+    nbAdd(u, w, sentence, false);
+    updateBadges();
+    saveDoc(w);
+    if (state.active && state.active.key === key) showWordCard(w, u, span);
+  } catch (e) {
+    if (state.active && state.active.key === key) renderCardError(errorCopy(e, "Kelime bilgisi"));
+  }
+}
+function showWordCard(w, u, span) {
+  // The other words of the expression in the same sentence are marked too.
+  const ws = new Set((u.text.match(WORD_RE) || []).map(norm));
+  if (ws.size > 1 && span) {
+    const p = span.closest("p");
+    const para = (w.versions[w.cur].paras[+span.dataset.p] || "");
+    [...p.querySelectorAll(".ww")].forEach((x) => { if (ws.has(norm(x.textContent)) && sentenceAtOffset(para, +x.dataset.o) === u.sentence) x.classList.add("here"); });
+  }
+  renderWordCard(w, u);
+  openWordCard();
+}
+function openWordCard() {
+  const fl = $("#flip");
+  fl.classList.remove("flipped");
+  fl.classList.add("peek");
+  $("#sheet").classList.add("open");
+  document.body.classList.add("sheet-open");
+  syncGuard();
+}
+function renderWordCard(w, u, loading) {
+  const f = $("#front");
+  f.innerHTML = ""; $("#back").innerHTML = "";
+  const top = el("div", "top");
+  if (!u) {
+    top.append(el("h3", null, loading), closeBtn());
+    f.append(top, el("p", "wait", "Anlamı getiriliyor…"));
+    peekify(f, 2);
+    return;
+  }
+  const head = el("div");
+  head.append(el("h3", null, u.lemma));
+  const tags = [KIND_TR[u.type], unitLevelLabel(u)].filter(Boolean);
+  if (tags.length) head.append(el("div", "kind", tags.join(", ")));
+  top.append(head, closeBtn());
+  f.append(top, el("p", "wtrline", u.tr || ""), el("p", "def", u.def));
+  const tr = el("p", "sent trs");
+  if (u.sentence_tr) fillTr(tr, u.sentence_tr);
+  else tr.textContent = u.sentence;
+  const nbKey = norm(u.lemma);
+  const inNb = () => { const x = state.nb.words[nbKey]; return !!(x && (x.docs || []).includes(w.id)); };
+  const kb = actBtn(inNb() ? "Bunu biliyordum" : "Defter’e ekle", () => {
+    if (inNb()) {
+      const x = state.nb.words[nbKey];
+      x.docs = x.docs.filter((id) => id !== w.id);
+      if (!x.docs.length) delete state.nb.words[nbKey];
+      w.taps = (w.taps || []).filter((t) => t.key !== "u:" + nbKey);
+      toast("Defter’den çıkarıldı");
+    } else {
+      nbAdd(u, w, u.sentence, false);
+      (w.taps = w.taps || []).push({ key: "u:" + nbKey, lemma: u.lemma, at: Date.now() });
+      toast("Defter’e eklendi");
+    }
+    saveNb(); saveDoc(w); updateBadges();
+    renderWordCard(w, u);
+  });
+  const acts = el("div", "acts");
+  acts.append(kb);
+  f.append(el("div", "kind", "Cümlede"), tr, acts);
+  peekify(f, 3);
 }
 
 // Signs of PDF extraction trouble in one part (original text only). Returns Turkish labels.
