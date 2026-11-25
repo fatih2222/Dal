@@ -61,6 +61,7 @@ const CONFIGS = [
   { name: "Sonnet 5.5, low", tier: { model: "claude-sonnet-5-5", effort: "low", fallback: true } },
 ];
 const PRICE = { "claude-haiku-5-5": [0.1, 0.5], "claude-sonnet-5-5": [2, 10] }; // $ per million tokens, in / out
+const OWN_TARGET = 50; // the usual reading level, for the rewrite part
 const REWRITE_EXTRA = [["ai", 70], ["routine", 70], ["novel", 30]];
 
 let W;
@@ -131,12 +132,12 @@ async function runCheck(cfg) {
 async function runRewrites(base) {
   const u0 = snap();
   const jobs = [];
-  base.rows.forEach((row) => { if (row.corr) jobs.push({ row, target: W.writerScore(row.corr).score, own: true }); });
+  base.rows.forEach((row) => { if (row.corr) jobs.push({ row, target: OWN_TARGET, own: true }); });
   REWRITE_EXTRA.forEach(([id, t]) => { const row = base.rows.find((r) => r.item.id === id); if (row && row.corr) jobs.push({ row, target: t, own: false }); });
   const out = await pool(jobs, 3, async (j) => {
     const t0 = performance.now();
     try {
-      const r = await W.eval("state").sample.json(W.writingRewritePrompt(j.row.corr, j.target, W.writerScore(j.row.corr).score), { modelTier: "default", schema: W.eval("WREWRITE_SCHEMA"), cache: false });
+      const r = await W.eval("state").sample.json(W.writingRewritePrompt(j.row.corr, j.target), { modelTier: "default", schema: W.eval("WREWRITE_SCHEMA"), cache: false });
       let paras = r.paragraphs.map((x) => String(x).replace(/\s+/g, " ").trim()).filter(Boolean);
       let m = W.measure(paras, j.target, []);
       const first = m.score;

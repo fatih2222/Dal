@@ -4498,15 +4498,8 @@ Work like a careful, encouraging English teacher.
 Reply with only this JSON:
 {"errors": [{"p": 1, "wrong": "...", "right": "...", "type": "grammar", "why": "..."}], "corrected": ["..."], "feedback": "..."}`;
 }
-function writingRewritePrompt(paras, target, own) {
+function writingRewritePrompt(paras, target) {
   const v = vocabRule(target, paras.reduce((a, x) => a + wc(x), 0));
-  // Measured: without this, a rewrite asked for well above the writer's level stays close to the original's words.
-  const shift = own == null || Math.abs(target - own) <= 8 ? ""
-    : target > own
-      ? `
-- Your version must read clearly more advanced than the original: wherever an everyday word or phrase appears, use the more precise, more sophisticated word a skilled ${scoreName(target)}-level writer would choose. Keep it natural and keep the meaning.`
-      : `
-- Your version must read clearly simpler than the original: replace difficult words and phrases with everyday ones a ${scoreName(target)}-level reader knows. Keep it natural and keep the meaning.`;
   return `You are rewriting a piece of writing by a Turkish adult who is learning English. Its mistakes have already been corrected. The paragraphs are numbered.
 
 <writing>
@@ -4516,7 +4509,7 @@ ${numbered(paras)}
 Rewrite it the way a skilled native writer would say the same things: natural, idiomatic and fluent, with smooth links between the sentences. For example, "I did it but I did not like it." could become "I gave it a shot, but I didn't love it."
 - Keep the writer's meaning, ideas, facts, point of view (I, we, they) and tone (personal, formal or informal). Add nothing new and leave nothing out.
 - Keep the same number of paragraphs: your paragraph 1 says what their paragraph 1 says, and so on.
-- Keep about the same length (within about 20%).${shift}
+- Keep about the same length (within about 20%).
 - ${v.text}
 - ${sentRule(target)}
 
@@ -4557,12 +4550,6 @@ function applyErrors(paras, errs) {
     return x.replace(/ {2,}/g, " ").trim();
   });
 }
-// The writer's level: score of the corrected text, measured twice so the reference band settles.
-function writerScore(paras) {
-  let m = measure(paras, 50, []);
-  m = measure(paras, m.score, []);
-  return { score: round(m.score * 10) / 10, n: m.n };
-}
 const wKey = (t) => String(round(t));
 function writingTitle(paras) {
   const first = paras[0] || "";
@@ -4592,8 +4579,6 @@ async function checkWriting(w, target) {
     // The model's corrected text is the base for scoring and rewriting when it lines up with the original.
     const base = corr.length === w.paras.length && corr.every(Boolean) ? corr : fixed;
     w.check = { errors, fixed, base, feedback: String((r && r.feedback) || "").trim(), model: TIERS.check.model, at: Date.now() };
-    // Not shown; only tells the rewrite prompt whether the target is far above or below the writer's words.
-    w.own = writerScore(base);
     w.status = "writing";
     wRefresh(w);
   } catch (e) {
@@ -4615,7 +4600,7 @@ async function rewriteWriting(w, target) {
   wRefresh(w);
   try {
     const base = w.check.base;
-    const r = await state.sample.json(writingRewritePrompt(base, target, w.own && w.own.score), { modelTier: "default", schema: WREWRITE_SCHEMA, cache: false });
+    const r = await state.sample.json(writingRewritePrompt(base, target), { modelTier: "default", schema: WREWRITE_SCHEMA, cache: false });
     let paras = (r && Array.isArray(r.paragraphs) ? r.paragraphs : []).map((x) => String(x || "").replace(/\s+/g, " ").trim()).filter(Boolean);
     if (!paras.length) throw { code: "invalid_json" };
     let m = measure(paras, target, []);

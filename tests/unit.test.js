@@ -109,9 +109,8 @@ suite("Kelime seviyeleri (Aşama 2)", (t) => {
     const cw = A("changedWords")("I did it but I did not like it.", ["I", "gave", "it", "a", "shot", "but", "I", "didn't", "love", "it"]);
     eq(cw.map((x) => (x ? 1 : 0)).join(""), "0101100110", "changed words found");
     const rp = A("writingRewritePrompt");
-    assert(rp(["I like it."], 70, 20).includes("more advanced than the original"), "pushed up when far above");
-    assert(rp(["I like it."], 20, 60).includes("simpler than the original"), "pushed down when far below");
-    assert(!/than the original:/.test(rp(["I like it."], 62, 60)), "no push near the writer's level");
+    assert(!/than the original/.test(rp(["I like it."], 70)), "no push away from the writer's own wording");
+    assert(rp(["I like it."], 70).includes("B2 level"), "target level in the prompt");
   });
   t("sıklık seviyeleri puan ölçeğini değiştirmiyor", () => {
     let n = 0; A("LEXMAP").forEach(() => n++);
