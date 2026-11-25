@@ -54,6 +54,12 @@
   --accent:#DCA6CE; --accent-ink:#2A1626; --mark:#7A5622; --mark-soft:#4E3A1E;
   --card:#281E27; --rule:#33262F; --danger:#F2A6A6; --accent-soft:#3A2836; color-scheme:dark;
 }
+:root[data-dal="dusk"]{
+  /* Akşam: a dim evening theme between light and dark. Dusky plum surface, warm cream text, amber accent: little blue light. */
+  --bg:#2B2530; --paper:#342D3A; --ink:#F2E6D8; --muted:#BDAFA7; --line:#4A4050;
+  --accent:#F0B46A; --accent-ink:#2B1D0E; --mark:#8A5E2A; --mark-soft:#5B4431;
+  --card:#3A3240; --rule:#40374A; --danger:#FFA3A3; --accent-soft:#4C3D3A; color-scheme:dark;
+}
 :root[data-dal="sepia"]{
   --bg:#F3EAD8; --paper:#F8F1E3; --ink:#3B2F24; --muted:#7A6A58; --line:#DCCCB0;
   --accent:#8A5A2B; --accent-ink:#FFFFFF; --mark:#E9C46A; --mark-soft:#F1DDA8;
@@ -5307,7 +5313,7 @@ function renderReadPanel(panel) {
   const si = Math.max(0, SIZES.indexOf(r.size));
   row("Yazı", [chip("A−", false, () => { r.size = SIZES[Math.max(0, si - 1)]; }), el("span", "rsval", `%${round(r.size * 100)}`), chip("A+", false, () => { r.size = SIZES[Math.min(SIZES.length - 1, si + 1)]; })]);
   row("Satır aralığı", [["Dar", 1.6], ["Normal", 1.78], ["Geniş", 2]].map(([l, v]) => chip(l, r.lh === v, () => { r.lh = v; })));
-  row("Tema", [["auto", "Otomatik"], ["light", "Açık"], ["dark", "Koyu"], ["sepia", "Sepya"], ["custom", "Özel"]].map(([k, l]) => chip(l, r.theme === k, () => {
+  row("Tema", [["auto", "Otomatik"], ["light", "Açık"], ["dark", "Koyu"], ["sepia", "Sepya"], ["dusk", "Akşam"], ["custom", "Özel"]].map(([k, l]) => chip(l, r.theme === k, () => {
     r.theme = k;
     if (k === "custom" && !r.custom) { const p = PALETTES[0]; r.custom = { bg: p.bg, ink: p.ink, accent: p.accent }; }
   })));
