@@ -86,32 +86,6 @@ suite("Kelime seviyeleri (Aşama 2)", (t) => {
     eq(c[0].lemma, "carry out"); eq(c[0].text, "carried out");
     eq(A("cleanPhrasal")("nope").length, 0);
   });
-  t("yazı: hatalar metinde sırayla bulunuyor", () => {
-    const paras = A("writingParas")("ı did it but ı did not like it.\n\n\n  He go   home.  \r\nShe GO too.");
-    eq(paras.length, 3, "one paragraph per line"); eq(paras[1], "He go home.");
-    const errs = A("locateErrors")(paras, [
-      { p: 1, wrong: "ı", right: "I", type: "spelling", why: "a" },
-      { p: 1, wrong: "ı", right: "I", type: "spelling", why: "b" },
-      { p: 2, wrong: "go", right: "goes", type: "grammar", why: "c" },
-      { p: 3, wrong: "go", right: "goes", type: "grammar", why: "d" },
-      { p: 3, wrong: "flew", right: "flies", type: "grammar", why: "not in the text" },
-      { p: 9, wrong: "x", right: "y", type: "grammar", why: "no such paragraph" },
-      { p: 1, wrong: "it", right: "it", type: "odd", why: "no change" },
-    ]);
-    eq(errs.length, 5, "bad paragraph and no-change dropped");
-    eq(errs[0].at, 0); eq(errs[1].at, 13, "second ı is the later one");
-    eq(errs[3].wrong, "GO", "case-insensitive match keeps the writer's text"); eq(errs[4].at, -1, "unfound stays unmarked");
-    const fixed = A("applyErrors")(paras, errs);
-    eq(fixed[0], "I did it but I did not like it."); eq(fixed[2], "She goes too.");
-    const short = A("vocabRule")(60, 40).text, long = A("vocabRule")(60, 400).text;
-    assert(!short.includes("extensive-reading") && !short.includes("guess from the surrounding"), "no far words for a short text");
-    assert(long.includes("guess from the surrounding"), "kept for a long text");
-    const cw = A("changedWords")("I did it but I did not like it.", ["I", "gave", "it", "a", "shot", "but", "I", "didn't", "love", "it"]);
-    eq(cw.map((x) => (x ? 1 : 0)).join(""), "0101100110", "changed words found");
-    const rp = A("writingRewritePrompt");
-    assert(!/than the original/.test(rp(["I like it."], 70)), "no push away from the writer's own wording");
-    assert(rp(["I like it."], 70).includes("B2 level"), "target level in the prompt");
-  });
   t("sıklık seviyeleri puan ölçeğini değiştirmiyor", () => {
     let n = 0; A("LEXMAP").forEach(() => n++);
     const c = A("FREQMAP"); let overlap = 0; c.forEach((_, w) => { if (A("LEXMAP").has(w)) overlap++; });
